@@ -21,6 +21,8 @@ namespace WFCTD.GridManagement
 
         [SerializeField] private MeshFilter _meshFilter;
 
+        private MarchingCubesVisualizer _marchingCubesVisualizer;
+
 #pragma warning disable CS0414 // Field is assigned but its value is never used
         [SerializeField] private bool _regenerateMesh;
 #pragma warning restore CS0414 // Field is assigned but its value is never used
@@ -41,6 +43,8 @@ namespace WFCTD.GridManagement
         private void UpdateMesh()
         {
             _regenerateMesh = false;
+         
+            _marchingCubesVisualizer ??= new MarchingCubesVisualizer();
             
             if (Cube == null || Cube.Corners.Length != MarchingCubeUtils.CornersPerCube)
             {
@@ -60,7 +64,7 @@ namespace WFCTD.GridManagement
             
             Vector3Int vertexAmount = new (2, 2, 2);
             GenerationProperties generationProperties = new ();
-            MarchingCubesVisualizer.MarchCubes(generationProperties, vertexAmount, _surface, _meshFilter, GetValue);
+            _marchingCubesVisualizer.MarchCubes(generationProperties, vertexAmount, _surface, _meshFilter, GetValue);
         }
         
         private float GetValue(int i, Vector3 position, GenerationProperties generationProperties)

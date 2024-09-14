@@ -11,15 +11,15 @@ namespace WFCTD.GridManagement
 {
     public class MarchingCubesVisualizer
     {
-        public static Vector3[] BaseVertices { get; private set; }
-        public static float[] VerticesValues { get; private set; }
+        public Vector3[] BaseVertices { get; private set; }
+        public float[] VerticesValues { get; private set; }
 
-        public static Vector3[] SubVertices { get; private set; }
-        public static Vector3[] Normals { get; private set; }
-        public static int[] Triangles { get; private set; }
-        public static int[] ValidTriangles { get; private set; }
+        public Vector3[] SubVertices { get; private set; }
+        public Vector3[] Normals { get; private set; }
+        public int[] Triangles { get; private set; }
+        public int[] ValidTriangles { get; private set; }
 
-        public static void MarchCubes(
+        public void MarchCubes(
             GenerationProperties generationProperties, 
             Vector3Int vertexAmount, 
             float surface, 
