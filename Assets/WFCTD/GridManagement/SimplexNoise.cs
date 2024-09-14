@@ -56,10 +56,11 @@ namespace WFCTD.GridManagement
 
         public static float Generate(Vector3 position)
         {
-            float x = position.x;
-            float y = position.y;
-            float z = position.z;
-            
+            return Generate(position.x, position.y, position.z);
+        }
+        
+        public static float Generate(float x, float y, float z)
+        {
             float s = (x + y + z) * F3; // Very nice and simple skew factor for 3D
             int i = Mathf.FloorToInt(x + s);
             int j = Mathf.FloorToInt(y + s);

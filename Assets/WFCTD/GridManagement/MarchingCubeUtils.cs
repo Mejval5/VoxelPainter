@@ -6,8 +6,8 @@ namespace WFCTD.GridManagement
 {
     public static class MarchingCubeUtils
     {
-        public const int CubeCornersCount = 8;
-        public const int CubeEdgesCount = 12;
+        public const int CornersPerCube = 8;
+        public const int EdgesPerCube = 12;
 
         private static int _precomputedTriangleConnectionTableWidth = -1;
         public static int PrecomputedTriangleConnectionTableWidth
@@ -357,10 +357,94 @@ namespace WFCTD.GridManagement
             { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }
         };
         
-        public static bool GetMarchedCube(Cube cube, Vector3 scale, float surface, Vector3[] vertices, int[] triangles, Vector3[] normals, int index)
+        private static readonly int[] VerticesHolder = new int[EdgesPerCube];
+        private static readonly int[] BaseVerticesHolder = new int[CornersPerCube];
+        private static readonly float[] VerticesValuesHolder = new float[CornersPerCube];
+        
+        public static void GetMarchedCube(
+            int[] baseVerticesOffsets, 
+            float[] values, 
+            int[] verticesOffsets, 
+            float surface, 
+            Vector3[] vertices, 
+            int[] triangles, 
+            Vector3[] normals,
+            int baseIndexOffset,
+            int triangleOffset,
+            int x,
+            int y,
+            int z,
+            bool useLerp)
         {
             int cubeIndex = 0;
-            for (int i = 0; i < CubeCornersCount; i++)
+            for (int i = 0; i < CornersPerCube; i++)
+            {
+                if (values[baseVerticesOffsets[i] + baseIndexOffset] > surface)
+                {
+                    cubeIndex |= 1 << i;
+                }
+            }
+            
+            int cubeEdgeFlags = CubeEdgeFlags[cubeIndex];
+            
+            for (int i = 0; i < EdgesPerCube; i++)
+            {
+                int startPointLocal = EdgeConnection[i, 0];
+                int endPointLocal = EdgeConnection[i, 1];
+                
+                int startPoint = baseVerticesOffsets[startPointLocal] + baseIndexOffset;
+                int endPoint = baseVerticesOffsets[endPointLocal] + baseIndexOffset;
+                
+                float startValue = values[startPoint];
+                float endValue = values[endPoint];
+                
+                bool hasCrossing = (cubeEdgeFlags & (1 << i)) != 0;
+
+                float offset = surface;
+                if (useLerp && hasCrossing)
+                {
+                    offset = (surface - startValue) / (endValue - startValue);
+                }
+                
+                int index = verticesOffsets[i];
+                vertices[index].x = EdgeDirection[i, 0] * offset + CubeCornersPositions[startPointLocal, 0] + x;
+                vertices[index].y = EdgeDirection[i, 1] * offset + CubeCornersPositions[startPointLocal, 1] + y;
+                vertices[index].z = EdgeDirection[i, 2] * offset + CubeCornersPositions[startPointLocal, 2] + z;
+            }
+            
+            for (int i = 0; i < PrecomputedTriangleConnectionTableWidth - 1;)
+            {
+                int vertexIndex = TriangleConnectionTable[cubeIndex, i];
+                if (vertexIndex == -1)
+                {
+                    break;
+                }
+
+                int offsetIndex = i;
+                for (int j = 0; j < 3; j++)
+                {
+                    int winding;
+                    
+                    if (surface > 0)
+                    {
+                        winding = 2 - j;
+                    }
+                    else
+                    {
+                        winding = j;
+                    }
+
+                    int localVertexIndex = TriangleConnectionTable[cubeIndex, offsetIndex + winding];
+                    triangles[i + triangleOffset] = verticesOffsets[localVertexIndex];
+                    i++;
+                }
+            }
+        }
+        
+        public static bool GetMarchedCube(Cube cube, float surface, Vector3[] vertices, int[] triangles, Vector3[] normals, int index)
+        {
+            int cubeIndex = 0;
+            for (int i = 0; i < CornersPerCube; i++)
             {
                 if (cube.Corners[i].value > surface)
                 {
@@ -369,7 +453,7 @@ namespace WFCTD.GridManagement
             }
             int cubeEdgeFlags = CubeEdgeFlags[cubeIndex];
             
-            for (int i = 0; i < CubeEdgesCount; i++)
+            for (int i = 0; i < EdgesPerCube; i++)
             {
                 int startPoint = EdgeConnection[i, 0];
                 int endPoint = EdgeConnection[i, 1];
@@ -385,9 +469,9 @@ namespace WFCTD.GridManagement
                     offset = (surface - startValue) / (endValue - startValue);
                 }
                 
-                float pointX = EdgeDirection[i, 0] * scale.x * offset + cube.Corners[startPoint].position.x;
-                float pointY = EdgeDirection[i, 1] * scale.y * offset + cube.Corners[startPoint].position.y;
-                float pointZ = EdgeDirection[i, 2] * scale.z * offset + cube.Corners[startPoint].position.z;
+                float pointX = EdgeDirection[i, 0] * offset + cube.Corners[startPoint].position.x;
+                float pointY = EdgeDirection[i, 1] * offset + cube.Corners[startPoint].position.y;
+                float pointZ = EdgeDirection[i, 2] * offset + cube.Corners[startPoint].position.z;
                 
                 Vector3 point = new (pointX, pointY, pointZ);
                 vertices[i + index] = point;
@@ -424,5 +508,7 @@ namespace WFCTD.GridManagement
             
             return false;
         }
+
+        public const int MaximumTrianglesPerCube = 5;
     }
 }

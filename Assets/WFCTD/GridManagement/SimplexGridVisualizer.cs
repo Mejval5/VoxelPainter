@@ -8,7 +8,7 @@ namespace WFCTD.GridManagement
     [ExecuteAlways]
     public class SimplexGridVisualizer : MonoBehaviour
     {
-        [SerializeField] private GridProperties _gridProperties;
+        [FormerlySerializedAs("_gridProperties")] [SerializeField] private GridProperties _generationProperties;
         [SerializeField] private MeshFilter _gridMeshFilter;        
         
         [Header("Draw Vertices")]
@@ -25,22 +25,22 @@ namespace WFCTD.GridManagement
         
         private void Awake()
         {
-            if (_gridProperties == null)
+            if (_generationProperties == null)
             {
                 return;
             }
             
-            _simplexGrid = new SimplexGrid(_gridProperties, Threshold);
+            _simplexGrid = new SimplexGrid(_generationProperties, Threshold);
         }
 
         private void OnValidate()
         {
-            if (_gridProperties == null)
+            if (_generationProperties == null)
             {
                 return;
             }
             
-            _simplexGrid ??= new SimplexGrid(_gridProperties, Threshold);
+            _simplexGrid ??= new SimplexGrid(_generationProperties, Threshold);
 
             Vector3[] vertices = _vertexMesh.vertices;
 
@@ -66,7 +66,7 @@ namespace WFCTD.GridManagement
             _vertexMeshInstance.RecalculateNormals();
             _vertexMeshInstance.RecalculateTangents();
 
-            _simplexGrid.UpdateGridProperties(_gridProperties, Threshold);
+            _simplexGrid.UpdateGridProperties(_generationProperties, Threshold);
         }
 
         private void DrawVerticesUsingGpuInstancing()

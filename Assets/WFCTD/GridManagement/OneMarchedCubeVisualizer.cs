@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using JetBrains.Annotations;
 using UnityEditor;
 using UnityEngine;
 
@@ -12,7 +13,6 @@ namespace WFCTD.GridManagement
     {
         [SerializeField] private float _surface;
 
-        [field: SerializeField] public Vector3 Scale { get; private set; } = Vector3.one;
         [field: SerializeField] public Color ActiveColor { get; private set; }
         [field: SerializeField] public Color InactiveColor { get; private set; }
         [field: SerializeField] public float GizmoSize { get; private set; } = 0.5f;
@@ -20,63 +20,52 @@ namespace WFCTD.GridManagement
         [field: SerializeField] public Cube Cube { get; private set; }
 
         [SerializeField] private MeshFilter _meshFilter;
-        
+
+#pragma warning disable CS0414 // Field is assigned but its value is never used
+        [SerializeField] private bool _regenerateMesh;
+#pragma warning restore CS0414 // Field is assigned but its value is never used
+
 #if UNITY_EDITOR
         private void OnValidate()
         {
-            EditorApplication.delayCall -= Setup;
-            EditorApplication.delayCall += Setup;
+            EditorApplication.delayCall -= UpdateMesh;
+            EditorApplication.delayCall += UpdateMesh;
         }
 #endif
 
         private void Start()
         {
-            Setup();
-        }
-
-        private void Setup()
-        {
-            Cube = new Cube
-            {
-                Corners = new GridPoint[MarchingCubeUtils.CubeCornersCount]
-            };
-
-            for (int i = 0; i < MarchingCubeUtils.CubeCornersCount; i++)
-            {
-                float x = MarchingCubeUtils.CubeCornersPositions[i, 0] * Scale.x;
-                float y = MarchingCubeUtils.CubeCornersPositions[i, 1] * Scale.y;
-                float z = MarchingCubeUtils.CubeCornersPositions[i, 2] * Scale.z;
-                Cube.Corners[i].position = new Vector3(x, y, z);
-            }
-
             UpdateMesh();
         }
 
         private void UpdateMesh()
         {
-            const int index = 0;
-            Vector3[] vertices = new Vector3[MarchingCubeUtils.CubeEdgesCount];
-            int[] triangles = new int[MarchingCubeUtils.CubeEdgesCount * 3];
-            Vector3[] normals = new Vector3[MarchingCubeUtils.CubeEdgesCount];
+            _regenerateMesh = false;
             
-            Array.Fill(triangles, -1);
-            
-            if (MarchingCubeUtils.GetMarchedCube(Cube, Scale, _surface, vertices, triangles, normals, index))
+            if (Cube == null || Cube.Corners.Length != MarchingCubeUtils.CornersPerCube)
             {
-                _meshFilter.sharedMesh = null;
-                return;
+                Cube = new Cube
+                {
+                    Corners = new GridPoint[MarchingCubeUtils.CornersPerCube]
+                };
+                
+                for (int i = 0; i < MarchingCubeUtils.CornersPerCube; i++)
+                {
+                    int x = i % 2;
+                    int z = (i % 4) / 2;
+                    int y = i / 4;
+                    Cube.Corners[i].position = new Vector3(x, y, z);
+                }
             }
-
-            Mesh mesh = new()
-            {
-                vertices = vertices,
-                triangles = triangles.Where(value => value != -1).ToArray(),
-                normals = normals
-            };
             
-            mesh.RecalculateBounds();
-            mesh.RecalculateTangents();
-            _meshFilter.sharedMesh = mesh;
+            Vector3Int vertexAmount = new (2, 2, 2);
+            GenerationProperties generationProperties = new ();
+            MarchingCubesVisualizer.MarchCubes(generationProperties, vertexAmount, _surface, _meshFilter, GetValue);
+        }
+        
+        private float GetValue(int i, Vector3 position, GenerationProperties generationProperties)
+        {
+            return Cube.Corners[i].value;
         }
 
 #if UNITY_EDITOR
@@ -103,7 +92,7 @@ namespace WFCTD.GridManagement
                     return;
                 }
                 
-                for (int i = 0; i < MarchingCubeUtils.CubeCornersCount; i++)
+                for (int i = 0; i < MarchingCubeUtils.CornersPerCube; i++)
                 {
                     DrawCorner(i);
                 }

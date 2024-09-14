@@ -9,110 +9,183 @@ using UnityEngine.Rendering;
 
 namespace WFCTD.GridManagement
 {
-    public class MarchingCubesVisualizer : MonoBehaviour
+    public class MarchingCubesVisualizer
     {
-        [SerializeField] private GridProperties _gridProperties;
-        [SerializeField] private MeshFilter _gridMeshFilter;        
-        
-        [field: SerializeField] private float Threshold { get; set; } = 0.5f;
-        [field: SerializeField] private Vector3Int CubeAmount { get; set; } = Vector3Int.one;
-      
-#if UNITY_EDITOR
-        private void OnValidate()
+        public static Vector3[] BaseVertices { get; private set; }
+        public static float[] VerticesValues { get; private set; }
+
+        public static Vector3[] SubVertices { get; private set; }
+        public static Vector3[] Normals { get; private set; }
+        public static int[] Triangles { get; private set; }
+        public static int[] ValidTriangles { get; private set; }
+
+        public static void MarchCubes(
+            GenerationProperties generationProperties, 
+            Vector3Int vertexAmount, 
+            float surface, 
+            MeshFilter gridMeshFilter,
+            Func<int, Vector3, GenerationProperties, float> getVertexValue,
+            int maxTriangles = int.MaxValue,
+            bool useLerp = true)
         {
-            EditorApplication.delayCall -= Setup;
-            EditorApplication.delayCall += Setup;
-        }
-#endif
-        
-        private Vector3[] _vertices;
-        private Vector3[] _normals;
-        private int[] _triangles;
-        
-        private void Setup()
-        {
-            if (_gridProperties == null)
+            if (generationProperties == null)
             {
                 return;
             }
             
             Profiler.BeginSample("MarchingCubesVisualizer.Setup");
 
-            int preAllocatedVertices = CubeAmount.x * CubeAmount.y * CubeAmount.z * MarchingCubeUtils.CubeEdgesCount;
-            if (_vertices == null || preAllocatedVertices != _vertices.Length)
+            int cubeAmountX = vertexAmount.x - 1;
+            int cubeAmountY = vertexAmount.y - 1;
+            int cubeAmountZ = vertexAmount.z - 1;
+            int amountOfCubes = cubeAmountX * cubeAmountY * cubeAmountZ;
+            int preAllocatedVerticesValues = vertexAmount.x * vertexAmount.y * vertexAmount.z;
+            int floorSize = vertexAmount.x * vertexAmount.z;
+            int frontFaceSize = vertexAmount.x * vertexAmount.y;
+            int sideFaceSize = vertexAmount.z * vertexAmount.y;
+            
+            int preAllocatedVertices = preAllocatedVerticesValues + (vertexAmount.y - 1) * floorSize + (vertexAmount.z - 1) * frontFaceSize + (vertexAmount.x - 1) * sideFaceSize;
+            bool recalculateVertices = SubVertices == null || preAllocatedVertices != SubVertices.Length;
+            if (recalculateVertices)
             {
-                _vertices = new Vector3[preAllocatedVertices];
+                SubVertices = new Vector3[preAllocatedVertices];
+            }
+            else
+            {
+                Array.Fill(SubVertices, Vector3.zero);
             }
             
-            int preAllocatedNormals = preAllocatedVertices;
-            if (_normals == null || preAllocatedNormals != _normals.Length)
+            bool recalculateVertexValues = VerticesValues == null || preAllocatedVerticesValues != VerticesValues.Length;
+            if (recalculateVertexValues)
             {
-                _normals = new Vector3[preAllocatedNormals];
+                BaseVertices = new Vector3[preAllocatedVerticesValues];
+                VerticesValues = new float[preAllocatedVerticesValues];
             }
             
-            int preAllocatedTriangles = preAllocatedVertices * 3;
-            if (_triangles == null || preAllocatedTriangles != _triangles.Length)
+            for (int i = 0; i < preAllocatedVerticesValues; i++)
             {
-                _triangles = new int[preAllocatedTriangles];
-                Array.Fill(_triangles, -1);
+                Vector3 pos;
+                pos.x = i % vertexAmount.x;
+                // ReSharper disable once PossibleLossOfFraction
+                pos.z  = (i % floorSize) / vertexAmount.x;
+                // ReSharper disable once PossibleLossOfFraction
+                pos.y  = i / floorSize;
+                
+                BaseVertices[i] = pos;
+                VerticesValues[i] = getVertexValue(i, pos, generationProperties);
             }
+
+            if (Normals == null || preAllocatedVertices != Normals.Length)
+            {
+                Normals = new Vector3[preAllocatedVertices];
+            }
+            else
+            {
+                Array.Fill(Normals, Vector3.zero);
+            }
+            
+            // Triangle has 3 vertices
+            int preAllocatedTriangles = amountOfCubes * MarchingCubeUtils.MaximumTrianglesPerCube * 3;
+            if (Triangles == null || preAllocatedTriangles != Triangles.Length)
+            {
+                Triangles = new int[preAllocatedTriangles];
+            }
+            
+            Array.Fill(Triangles, -1);
+            
             Profiler.EndSample();
             
-            Profiler.BeginSample("MarchingCubesVisualizer.MarchCubes");
-            Vector3 scale = _gridProperties.Scale;
-            int index = 0;
-            const float maxValueOfInt = int.MaxValue;
-            Cube cube = new ();
-            cube.Corners ??= new GridPoint[MarchingCubeUtils.CubeCornersCount];
-            
-            for (int x = 0; x < CubeAmount.x; x++)
-            {
-                for (int y = 0; y < CubeAmount.y; y++)
-                {
-                    for (int z = 0; z < CubeAmount.z; z++)
-                    {
-                        for (int i = 0; i < MarchingCubeUtils.CubeCornersCount; i++)
-                        {
-                            cube.Corners[i].position.x = (MarchingCubeUtils.CubeCornersPositions[i, 0] + x) * scale.x;
-                            cube.Corners[i].position.y = (MarchingCubeUtils.CubeCornersPositions[i, 1] + y) * scale.y;
-                            cube.Corners[i].position.z = (MarchingCubeUtils.CubeCornersPositions[i, 2] + z) * scale.z;
-                            cube.Corners[i].value = Mathf.Abs(cube.Corners[i].position.GetHashCode() / maxValueOfInt);
-                        }
+            Profiler.BeginSample("MarchingCubesVisualizer.ConstructVertices");
 
-                        MarchingCubeUtils.GetMarchedCube(cube, scale, Threshold, _vertices, _triangles, _normals, index);
-                        
-                        index += MarchingCubeUtils.CubeEdgesCount;
-                    }
-                }
+            int[] baseVerticesOffsets =
+            {
+                0, 1, floorSize + 1, floorSize, vertexAmount.x, vertexAmount.x + 1, vertexAmount.x + floorSize + 1, vertexAmount.x + floorSize
+            };
+
+            int middleOffset = vertexAmount.x * cubeAmountZ + vertexAmount.z * cubeAmountX;
+            int topOffset = vertexAmount.x * vertexAmount.z + middleOffset;
+            
+            int[] verticesOffsets = new int[12];
+
+            int cubeFloor = cubeAmountX * cubeAmountZ;
+            int triangleOffset = 0;
+            for (int i = 0; i < amountOfCubes; i++)
+            {
+                int xIndex = i % cubeAmountX;
+                int zIndex = (i % cubeFloor) / cubeAmountX;
+                int yIndex = i / cubeFloor;
+                
+                int indexOffset = xIndex + zIndex * (cubeAmountX + vertexAmount.x) + yIndex * topOffset;
+                int baseIndexOffset = xIndex + zIndex * vertexAmount.x + yIndex * floorSize;
+                
+                int middleIndexOffset = middleOffset - zIndex * cubeAmountX;
+                
+                // Front face
+                verticesOffsets[0] = indexOffset;
+                verticesOffsets[1] = indexOffset + middleIndexOffset + 1;
+                verticesOffsets[2] = indexOffset + topOffset;
+                verticesOffsets[3] = indexOffset + middleIndexOffset;
+                
+                // Back face
+                verticesOffsets[4] = indexOffset + cubeAmountX + vertexAmount.x;
+                verticesOffsets[5] = indexOffset + middleIndexOffset + vertexAmount.x + 1;
+                verticesOffsets[6] = indexOffset + topOffset + vertexAmount.x + cubeAmountX;
+                verticesOffsets[7] = indexOffset + middleIndexOffset + vertexAmount.x;
+                
+                // Middle face
+                verticesOffsets[8] = indexOffset + cubeAmountX;
+                verticesOffsets[9] = indexOffset + cubeAmountX + 1;
+                verticesOffsets[10] = indexOffset + topOffset + cubeAmountX + 1;
+                verticesOffsets[11] = indexOffset + topOffset + cubeAmountX;
+
+                MarchingCubeUtils.GetMarchedCube(
+                    baseVerticesOffsets, 
+                    VerticesValues, 
+                    verticesOffsets, 
+                    surface, 
+                    SubVertices, 
+                    Triangles, 
+                    Normals,
+                    baseIndexOffset,
+                    triangleOffset,
+                    xIndex,
+                    yIndex,
+                    zIndex,
+                    useLerp);
+                
+                triangleOffset += MarchingCubeUtils.MaximumTrianglesPerCube * 3;
             }
             
             Profiler.EndSample();
             Profiler.BeginSample("MarchingCubesVisualizer.AssignMesh");
 
+            int maxItemsToPick = maxTriangles * 3;
+            if (maxItemsToPick < 0)
+            {
+                maxItemsToPick = Triangles.Length;
+            }
+            ValidTriangles = Triangles.Where(value => value != -1).Take(maxItemsToPick).ToArray();
+            
             Mesh mesh = new()
             {
-                indexFormat = _vertices.Length > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16,
-                vertices = _vertices,
-                triangles = _triangles.Where(value => value != -1).ToArray(),
-                normals = _normals
+                indexFormat = SubVertices.Length > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16,
+                vertices = SubVertices,
+                triangles = ValidTriangles,
+                normals = Normals
             };
             
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.RecalculateMesh");
+            mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             mesh.RecalculateTangents();
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.AssignMesh");
-            _gridMeshFilter.sharedMesh = mesh;
-            _gridMeshFilter.sharedMesh.hideFlags = HideFlags.DontSave;
+            gridMeshFilter.sharedMesh = mesh;
+            gridMeshFilter.sharedMesh.hideFlags = HideFlags.DontSave;
             Profiler.EndSample();
-        }
-
-        private float CustomNoiseSimplex(Vector3 position)
-        {
-            return Mathf.Clamp01(Mathf.Pow(SimplexNoise.Generate(position / _gridProperties.Frequency), 2));
         }
     }
 }

@@ -10,46 +10,53 @@ namespace WFCTD.GridManagement
         public Vector3 position;
         public float value;
     }
+
+    [Serializable]
+    public class GridProperties : GenerationProperties
+    {
+        [field: SerializeField] public float Density { get; set; }
+        [field: SerializeField] public Vector3 Scale { get; set; } = Vector3.one;
+    }
     
     [Serializable]
     public class Grid
     {
         
-        private GridProperties _gridProperties;
+        private GridProperties _generationProperties;
         private Func<Vector3, float> _noiseFunction;
         
         public GridPoint[] GridPoints { get; private set; }
 
-        public Grid(GridProperties gridProperties, Func<Vector3, float> noiseFunction)
+        public Grid(GridProperties generationProperties, Func<Vector3, float> noiseFunction)
         {
-            _gridProperties = gridProperties;
+            _generationProperties = generationProperties;
             _noiseFunction = noiseFunction;
             RecalculateGrid();
         }
         
-        public void UpdateGridProperties(GridProperties gridProperties, Func<Vector3, float> noiseFunction)
+        public void UpdateGridProperties(GridProperties generationProperties, Func<Vector3, float> noiseFunction)
         {
-            _gridProperties = gridProperties;
+            _generationProperties = generationProperties;
             _noiseFunction = noiseFunction;
             RecalculateGrid();
         }
         
         private void RecalculateGrid()
         {
-            if (_gridProperties.Density <= 0)
+            if (_generationProperties.Density <= 0)
             {
                 return;
             }
 
-            float distanceBetweenVertices = 1 / _gridProperties.Density;
+            float distanceBetweenVertices = 1 / _generationProperties.Density;
 
-            int xSize = Mathf.CeilToInt(_gridProperties.Scale.x / distanceBetweenVertices);
-            int ySize = Mathf.CeilToInt(_gridProperties.Scale.y / distanceBetweenVertices);
-            int zSize = Mathf.CeilToInt(_gridProperties.Scale.z / distanceBetweenVertices);
+            int xSize = Mathf.CeilToInt(_generationProperties.Scale.x / distanceBetweenVertices);
+            int ySize = Mathf.CeilToInt(_generationProperties.Scale.y / distanceBetweenVertices);
+            int zSize = Mathf.CeilToInt(_generationProperties.Scale.z / distanceBetweenVertices);
             
             GridPoints = new GridPoint[(xSize + 1) * (ySize + 1) * (zSize + 1)];
             
-            Vector3 halfSize = _gridProperties.Scale / 2;
+            Vector3 halfSize = _generationProperties.Scale / 2;
             for (int i = 0, y = 0; y <= ySize; y++)
             {
                 for (int x = 0; x <= xSize; x++)
@@ -58,10 +65,10 @@ namespace WFCTD.GridManagement
                     {
                         Vector3 offset = new (x * distanceBetweenVertices, y * distanceBetweenVertices, z * distanceBetweenVertices);
                         
-                        Vector3 vertex = offset + _gridProperties.Origin - halfSize;
-                        vertex.x *= _gridProperties.Frequency;
-                        vertex.y *= _gridProperties.Frequency;
-                        vertex.z *= _gridProperties.Frequency;
+                        Vector3 vertex = offset + _generationProperties.Origin - halfSize;
+                        vertex.x *= _generationProperties.Frequency;
+                        vertex.y *= _generationProperties.Frequency;
+                        vertex.z *= _generationProperties.Frequency;
                         float value = _noiseFunction.Invoke(vertex);      
                         
                         GridPoints[i] = new GridPoint

@@ -5,21 +5,21 @@ namespace WFCTD.GridManagement
 {
     public class SimplexGrid
     {
-        private GridProperties _gridProperties;
+        private GridProperties _generationProperties;
 
         public Grid Grid { get; private set; }
         
         public Mesh GridMesh { get; private set; }
 
-        public SimplexGrid(GridProperties gridProperties, float threshold)
+        public SimplexGrid(GridProperties generationProperties, float threshold)
         {
-            _gridProperties = gridProperties;
+            _generationProperties = generationProperties;
             RecalculateGrid(threshold);
         }
         
-        public void UpdateGridProperties(GridProperties gridProperties, float threshold)
+        public void UpdateGridProperties(GridProperties generationProperties, float threshold)
         {
-            _gridProperties = gridProperties;
+            _generationProperties = generationProperties;
             RecalculateGrid(threshold);
         }
         
@@ -27,11 +27,11 @@ namespace WFCTD.GridManagement
         {
             if (Grid == null)
             {
-                Grid = new Grid(_gridProperties, SimplexNoise.Generate);
+                Grid = new Grid(_generationProperties, SimplexNoise.Generate);
             }
             else
             {
-                Grid.UpdateGridProperties(_gridProperties, SimplexNoise.Generate);
+                Grid.UpdateGridProperties(_generationProperties, SimplexNoise.Generate);
             }
 
             GridPoint[] gridPoints = Grid.GridPoints;
