@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.Profiling;
 using UnityEngine.Serialization;
 using UnityEngine.Video;
 
@@ -73,6 +74,7 @@ namespace WFCTD.GridManagement
         
         public override float GetGridValue(int i, Vector3 position, GenerationProperties generationProperties)
         {
+            Profiler.BeginSample("GetGridValue");
             // Ensure the texture is available
             if (_videoFrameTexture == null)
             {
@@ -105,6 +107,7 @@ namespace WFCTD.GridManagement
             float xRelativeToVideo = (position.x - xOffset) * scale;
             float yRelativeToVideo = position.y * scale;
 
+            float finalValue = _invertOutput ? 1f : 0f;;
             // Check if the position is within the video frame bounds
             if (xRelativeToVideo >= 0 && xRelativeToVideo < videoWidth && yRelativeToVideo >= 0 && yRelativeToVideo < videoHeight)
             {
@@ -118,24 +121,24 @@ namespace WFCTD.GridManagement
 
                 float depth = value * gridDepth * _depthMultiplier;
 
-                if (position.z <= depth)
+                if (gridDepth - position.z <= depth)
                 {
-                    return _invertOutput ? 1f - value : value;
+                    finalValue = _invertOutput ? 1f - value : value;
                 }
                 else
                 {
-                    return _invertOutput ? 1f : 0f;
+                    finalValue = _invertOutput ? 1f : 0f;
                 }
-
-                return _invertOutput ? 1f - value : value;
             }
+            
+            Profiler.EndSample();
 
-            // Outside the video frame, return zero or a default value
-            return _invertOutput ? 1f : 0f;
+            return finalValue;
         }
 
         private float SameplMipMaps(float xRelativeToVideo, int videoWidth, float yRelativeToVideo, int videoHeight)
         {
+            Profiler.BeginSample("SampleMipMaps");
             // Adjust coordinates for mipmap level
             // Normalize coordinates
             float xNormalized = xRelativeToVideo / videoWidth;
@@ -151,12 +154,15 @@ namespace WFCTD.GridManagement
                 int pixelYm = Mathf.Clamp((int)(yNormalized * mipHeight), 0, mipHeight - 1);
 
                 // Get the pixel color from the specified mipmap level
+                Profiler.BeginSample("GetPixel");
                 Color pixelColorMipMap = _videoFrameTexture.GetPixel(pixelXm, pixelYm, i);
+                Profiler.EndSample();
 
                 // Convert color to grayscale (or use one of the color channels)
                 value += pixelColorMipMap.grayscale;
             }
 
+            Profiler.EndSample();
             return value;
         }
     }
