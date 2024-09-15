@@ -159,12 +159,14 @@ namespace WFCTD.GridManagement
             Profiler.EndSample();
             Profiler.BeginSample("MarchingCubesVisualizer.AssignMesh");
 
+            Profiler.BeginSample("MarchingCubesVisualizer.PruneTriangles");
             int maxItemsToPick = maxTriangles * 3;
             if (maxItemsToPick < 0)
             {
                 maxItemsToPick = Triangles.Length;
             }
             ValidTriangles = Triangles.Where(value => value != -1).Take(maxItemsToPick).ToArray();
+            Profiler.EndSample();
             
             Mesh mesh = new()
             {
@@ -173,13 +175,23 @@ namespace WFCTD.GridManagement
                 triangles = ValidTriangles,
                 normals = Normals
             };
-            
             Profiler.EndSample();
             
+            
             Profiler.BeginSample("MarchingCubesVisualizer.RecalculateMesh");
-            mesh.RecalculateNormals();
+            
+            // Profiler.BeginSample("MarchingCubesVisualizer.RecalculateNormals");
+            // mesh.RecalculateNormals();
+            // Profiler.EndSample();
+            
+            Profiler.BeginSample("MarchingCubesVisualizer.RecalculateBounds");
             mesh.RecalculateBounds();
-            mesh.RecalculateTangents();
+            Profiler.EndSample();
+            
+            // Profiler.BeginSample("MarchingCubesVisualizer.RecalculateTangents");
+            // mesh.RecalculateTangents();
+            // Profiler.EndSample();
+            
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.AssignMesh");
