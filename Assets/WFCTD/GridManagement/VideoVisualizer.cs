@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.Video;
 
 namespace WFCTD.GridManagement
@@ -16,6 +17,9 @@ namespace WFCTD.GridManagement
 
         [SerializeField] private bool _invertOutput = false;
         
+        [SerializeField] private int _downSampleFactor = 2;
+        [SerializeField] private float _depthMultiplier = 1f;
+        
         
         private void OnEnable()
         {
@@ -31,7 +35,7 @@ namespace WFCTD.GridManagement
             _videoPlayer.targetTexture = _renderTexture;
                 
             // Initialize Texture2D
-            _videoFrameTexture = new Texture2D(_renderTexture.width, _renderTexture.height, TextureFormat.RGBA32, false);
+            _videoFrameTexture = new Texture2D(_renderTexture.width, _renderTexture.height, TextureFormat.RGBA32, true);
 
             // Start playing the video
             _videoPlayer.Play();
@@ -60,13 +64,13 @@ namespace WFCTD.GridManagement
             RenderTexture.active = _renderTexture;
 
             _videoFrameTexture.ReadPixels(new Rect(0, 0, _renderTexture.width, _renderTexture.height), 0, 0);
-            _videoFrameTexture.Apply();
+            _videoFrameTexture.Apply(true);
 
             RenderTexture.active = currentRT;
             
             GenerateMesh();
         }
-
+        
         public override float GetGridValue(int i, Vector3 position, GenerationProperties generationProperties)
         {
             // Ensure the texture is available
@@ -78,6 +82,7 @@ namespace WFCTD.GridManagement
             // Get grid dimensions
             int gridWidth = VertexAmountX;
             int gridHeight = VertexAmountY;
+            int gridDepth = VertexAmountZ;
 
             // Get video frame dimensions
             int videoWidth = _videoFrameTexture.width;
@@ -103,22 +108,56 @@ namespace WFCTD.GridManagement
             // Check if the position is within the video frame bounds
             if (xRelativeToVideo >= 0 && xRelativeToVideo < videoWidth && yRelativeToVideo >= 0 && yRelativeToVideo < videoHeight)
             {
-                int pixelX = Mathf.Clamp((int)xRelativeToVideo, 0, videoWidth - 1);
-                int pixelY = Mathf.Clamp((int)yRelativeToVideo, 0, videoHeight - 1);
+                // int pixelX = Mathf.Clamp((int)xRelativeToVideo, 0, videoWidth - 1);
+                // int pixelY = Mathf.Clamp((int)yRelativeToVideo, 0, videoHeight - 1);
+                //
+                // // Get the pixel color
+                // Color pixelColor = _videoFrameTexture.GetPixel(pixelX, pixelY);
+                
+                float value = SameplMipMaps(xRelativeToVideo, videoWidth, yRelativeToVideo, videoHeight);
 
-                // Get the pixel color
-                Color pixelColor = _videoFrameTexture.GetPixel(pixelX, pixelY);
+                float depth = value * gridDepth * _depthMultiplier;
 
-                // Convert color to grayscale (or use one of the color channels)
-                float value = pixelColor.grayscale;
+                if (position.z <= depth)
+                {
+                    return _invertOutput ? 1f - value : value;
+                }
+                else
+                {
+                    return _invertOutput ? 1f : 0f;
+                }
 
                 return _invertOutput ? 1f - value : value;
             }
-            else
+
+            // Outside the video frame, return zero or a default value
+            return _invertOutput ? 1f : 0f;
+        }
+
+        private float SameplMipMaps(float xRelativeToVideo, int videoWidth, float yRelativeToVideo, int videoHeight)
+        {
+            // Adjust coordinates for mipmap level
+            // Normalize coordinates
+            float xNormalized = xRelativeToVideo / videoWidth;
+            float yNormalized = yRelativeToVideo / videoHeight;
+            
+            float value = 0f;
+            for (int i = 0; i < _downSampleFactor; i++)
             {
-                // Outside the video frame, return zero or a default value
-                return 0f;
+                int mipWidth = _videoFrameTexture.width >> i;
+                int mipHeight = _videoFrameTexture.height >> i;
+                
+                int pixelXm = Mathf.Clamp((int)(xNormalized * mipWidth), 0, mipWidth - 1);
+                int pixelYm = Mathf.Clamp((int)(yNormalized * mipHeight), 0, mipHeight - 1);
+
+                // Get the pixel color from the specified mipmap level
+                Color pixelColorMipMap = _videoFrameTexture.GetPixel(pixelXm, pixelYm, i);
+
+                // Convert color to grayscale (or use one of the color channels)
+                value += pixelColorMipMap.grayscale;
             }
+
+            return value;
         }
     }
 }

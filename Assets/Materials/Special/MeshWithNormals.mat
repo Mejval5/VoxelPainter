@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: MeshWithNormals
-  m_Shader: {fileID: -6465566751694194690, guid: fc22d08ad3506004ca0c95d235003aab,
+  m_Shader: {fileID: -6465566751694194690, guid: c91ae4b5824f5614fbffce7fb6027db3,
     type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -47,17 +47,19 @@ Material:
     m_Ints: []
     m_Floats:
     - _AO: 0
-    - _BaseHeight: 16
+    - _BaseColor: 0
+    - _BaseHeight: -200
     - _HeighScale: 1.5
-    - _Metallic: 0.361
+    - _Metallic: 0
     - _NoiseBase: 0
     - _NoiseScale: 50
     - _NoiseSize: 0.1
     - _QueueControl: 0
     - _QueueOffset: 0
     - _SideStrength: -0.04
-    - _Smooth: 1
+    - _Smooth: 0
     m_Colors:
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _ConstantLight: {r: 0, g: 0, b: 0, a: 0.49411765}
     - _Emission: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
