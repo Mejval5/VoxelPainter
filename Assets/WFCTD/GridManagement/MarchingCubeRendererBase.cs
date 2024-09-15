@@ -68,11 +68,11 @@ namespace WFCTD.GridManagement
 
         private void OnValidate()
         {
-            EditorApplication.delayCall -= Setup;
-            EditorApplication.delayCall += Setup;
+            EditorApplication.delayCall -= GenerateMesh;
+            EditorApplication.delayCall += GenerateMesh;
         }
 
-        protected virtual void Setup()
+        protected virtual void GenerateMesh()
         {
             _marchingCubesVisualizer ??= new MarchingCubesVisualizer();
             

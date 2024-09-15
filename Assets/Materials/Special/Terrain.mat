@@ -40,11 +40,11 @@ Material:
     m_Floats:
     - _AO: 0
     - _BaseHeight: 22
-    - _HeighScale: 7.9
-    - _Metallic: 0
+    - _HeighScale: 4.8
+    - _Metallic: 0.701
     - _QueueControl: 0
     - _QueueOffset: 0
-    - _Smooth: 0
+    - _Smooth: 0.109
     m_Colors:
     - _Emission: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
