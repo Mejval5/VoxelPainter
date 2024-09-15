@@ -361,16 +361,15 @@ namespace WFCTD.GridManagement
         private static readonly int[] BaseVerticesHolder = new int[CornersPerCube];
         private static readonly float[] VerticesValuesHolder = new float[CornersPerCube];
         
-        public static void GetMarchedCube(
+        public static int GetMarchedCube(
             int[] baseVerticesOffsets, 
             float[] values, 
             int[] verticesOffsets, 
             float surface, 
             Vector3[] vertices, 
-            int[] triangles, 
-            Vector3[] normals,
+            int[] triangles,
             int baseIndexOffset,
-            int triangleOffset,
+            int triangleCount,
             int x,
             int y,
             int z,
@@ -386,6 +385,12 @@ namespace WFCTD.GridManagement
             }
             
             int cubeEdgeFlags = CubeEdgeFlags[cubeIndex];
+            
+            // Skip processing if cube is entirely inside or outside the surface
+            if (cubeIndex is 0 or 255)
+            {
+                return triangleCount;
+            }
             
             for (int i = 0; i < EdgesPerCube; i++)
             {
@@ -435,80 +440,15 @@ namespace WFCTD.GridManagement
                     }
 
                     int localVertexIndex = TriangleConnectionTable[cubeIndex, offsetIndex + winding];
-                    triangles[i + triangleOffset] = verticesOffsets[localVertexIndex];
+                    triangles[triangleCount] = verticesOffsets[localVertexIndex];
+                    triangleCount++;
                     i++;
                 }
             }
+
+            return triangleCount;
         }
         
-        public static bool GetMarchedCube(Cube cube, float surface, Vector3[] vertices, int[] triangles, Vector3[] normals, int index)
-        {
-            int cubeIndex = 0;
-            for (int i = 0; i < CornersPerCube; i++)
-            {
-                if (cube.Corners[i].value > surface)
-                {
-                    cubeIndex |= 1 << i;
-                }
-            }
-            int cubeEdgeFlags = CubeEdgeFlags[cubeIndex];
-            
-            for (int i = 0; i < EdgesPerCube; i++)
-            {
-                int startPoint = EdgeConnection[i, 0];
-                int endPoint = EdgeConnection[i, 1];
-                
-                float startValue = cube.Corners[startPoint].value;
-                float endValue = cube.Corners[endPoint].value;
-                
-                bool hasCrossing = (cubeEdgeFlags & (1 << i)) != 0;
-
-                float offset = surface;
-                if (hasCrossing)
-                {
-                    offset = (surface - startValue) / (endValue - startValue);
-                }
-                
-                float pointX = EdgeDirection[i, 0] * offset + cube.Corners[startPoint].position.x;
-                float pointY = EdgeDirection[i, 1] * offset + cube.Corners[startPoint].position.y;
-                float pointZ = EdgeDirection[i, 2] * offset + cube.Corners[startPoint].position.z;
-                
-                Vector3 point = new (pointX, pointY, pointZ);
-                vertices[i + index] = point;
-            }
-            
-            for (int i = 0; i < PrecomputedTriangleConnectionTableWidth - 1;)
-            {
-                int vertexIndex = TriangleConnectionTable[cubeIndex, i];
-                if (vertexIndex == -1)
-                {
-                    triangles[i + index * 3] = -1;
-                    i += 1;
-                    continue;
-                }
-
-                int offsetIndex = i;
-                for (int j = 0; j < 3; j++)
-                {
-                    int winding;
-                    
-                    if (surface > 0)
-                    {
-                        winding = 2 - j;
-                    }
-                    else
-                    {
-                        winding = j;
-                    }
-
-                    triangles[i + index * 3] = TriangleConnectionTable[cubeIndex, offsetIndex + winding] + index;
-                    i++;
-                }
-            }
-            
-            return false;
-        }
-
         public const int MaximumTrianglesPerCube = 5;
     }
 }

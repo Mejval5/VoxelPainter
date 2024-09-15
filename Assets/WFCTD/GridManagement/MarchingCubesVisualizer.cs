@@ -15,7 +15,6 @@ namespace WFCTD.GridManagement
         public float[] VerticesValues { get; private set; }
 
         public Vector3[] SubVertices { get; private set; }
-        public Vector3[] Normals { get; private set; }
         public int[] Triangles { get; private set; }
         public int[] ValidTriangles { get; private set; }
 
@@ -26,7 +25,8 @@ namespace WFCTD.GridManagement
             MeshFilter gridMeshFilter,
             Func<int, Vector3, GenerationProperties, float> getVertexValue,
             int maxTriangles = int.MaxValue,
-            bool useLerp = true)
+            bool useLerp = true,
+            bool enforceEmptyBorder = true)
         {
             if (generationProperties == null)
             {
@@ -64,24 +64,23 @@ namespace WFCTD.GridManagement
             
             for (int i = 0; i < preAllocatedVerticesValues; i++)
             {
-                Vector3 pos;
+                Vector3Int pos = Vector3Int.zero;
                 pos.x = i % vertexAmount.x;
-                // ReSharper disable once PossibleLossOfFraction
                 pos.z  = (i % floorSize) / vertexAmount.x;
-                // ReSharper disable once PossibleLossOfFraction
                 pos.y  = i / floorSize;
-                
-                BaseVertices[i] = pos;
-                VerticesValues[i] = getVertexValue(i, pos, generationProperties);
-            }
 
-            if (Normals == null || preAllocatedVertices != Normals.Length)
-            {
-                Normals = new Vector3[preAllocatedVertices];
-            }
-            else
-            {
-                Array.Fill(Normals, Vector3.zero);
+                BaseVertices[i] = pos;
+                
+                if (enforceEmptyBorder)
+                {
+                    if (IsBorder(pos, vertexAmount))
+                    {
+                        VerticesValues[i] = 0;
+                        continue;
+                    }
+                }
+                
+                VerticesValues[i] = getVertexValue(i, pos, generationProperties);
             }
             
             // Triangle has 3 vertices
@@ -95,7 +94,6 @@ namespace WFCTD.GridManagement
             
             Profiler.EndSample();
             
-            Profiler.BeginSample("MarchingCubesVisualizer.ConstructVertices");
 
             int[] baseVerticesOffsets =
             {
@@ -108,7 +106,9 @@ namespace WFCTD.GridManagement
             int[] verticesOffsets = new int[12];
 
             int cubeFloor = cubeAmountX * cubeAmountZ;
-            int triangleOffset = 0;
+            int triangleCount = 0;
+            
+            Profiler.BeginSample("MarchingCubesVisualizer.ConstructVertices");
             for (int i = 0; i < amountOfCubes; i++)
             {
                 int xIndex = i % cubeAmountX;
@@ -138,66 +138,70 @@ namespace WFCTD.GridManagement
                 verticesOffsets[10] = indexOffset + topOffset + cubeAmountX + 1;
                 verticesOffsets[11] = indexOffset + topOffset + cubeAmountX;
 
-                MarchingCubeUtils.GetMarchedCube(
+                triangleCount = MarchingCubeUtils.GetMarchedCube(
                     baseVerticesOffsets, 
                     VerticesValues, 
                     verticesOffsets, 
                     surface, 
                     SubVertices, 
-                    Triangles, 
-                    Normals,
+                    Triangles,
                     baseIndexOffset,
-                    triangleOffset,
+                    triangleCount,
                     xIndex,
                     yIndex,
                     zIndex,
                     useLerp);
-                
-                triangleOffset += MarchingCubeUtils.MaximumTrianglesPerCube * 3;
             }
-            
             Profiler.EndSample();
-            Profiler.BeginSample("MarchingCubesVisualizer.AssignMesh");
 
             Profiler.BeginSample("MarchingCubesVisualizer.PruneTriangles");
             int maxItemsToPick = maxTriangles * 3;
-            if (maxItemsToPick < 0)
+            if (maxItemsToPick < 0 || maxItemsToPick > Triangles.Length)
             {
                 maxItemsToPick = Triangles.Length;
             }
-            ValidTriangles = Triangles.Where(value => value != -1).Take(maxItemsToPick).ToArray();
-            Profiler.EndSample();
             
-            Mesh mesh = new()
+            maxItemsToPick = Mathf.Min(maxItemsToPick, triangleCount);
+
+            // Create and fill the ValidTriangles array
+            ValidTriangles = new int[maxItemsToPick];
+            for (int i = 0; i < maxItemsToPick; i++)
             {
-                indexFormat = SubVertices.Length > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16,
-                vertices = SubVertices,
-                triangles = ValidTriangles,
-                normals = Normals
-            };
-            Profiler.EndSample();
-            
-            
-            Profiler.BeginSample("MarchingCubesVisualizer.RecalculateMesh");
-            
-            // Profiler.BeginSample("MarchingCubesVisualizer.RecalculateNormals");
-            // mesh.RecalculateNormals();
-            // Profiler.EndSample();
-            
-            Profiler.BeginSample("MarchingCubesVisualizer.RecalculateBounds");
-            mesh.RecalculateBounds();
-            Profiler.EndSample();
-            
-            // Profiler.BeginSample("MarchingCubesVisualizer.RecalculateTangents");
-            // mesh.RecalculateTangents();
-            // Profiler.EndSample();
+                ValidTriangles[i] = Triangles[i];
+            }
             
             Profiler.EndSample();
+            
+            Profiler.BeginSample("MarchingCubesVisualizer.FillMesh");
+            Mesh sharedMesh = gridMeshFilter.sharedMesh;
+            if (sharedMesh != null)
+            {
+                sharedMesh.vertices = SubVertices;
+                sharedMesh.triangles = ValidTriangles;
+            }
+            else
+            {
+                sharedMesh = new Mesh()
+                {
+                    indexFormat = SubVertices.Length > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16,
+                    vertices = SubVertices,
+                    triangles = ValidTriangles
+                };
+            }
+            
+            Profiler.EndSample();
+            
+            sharedMesh.RecalculateBounds();
             
             Profiler.BeginSample("MarchingCubesVisualizer.AssignMesh");
-            gridMeshFilter.sharedMesh = mesh;
+            gridMeshFilter.sharedMesh = sharedMesh;
             gridMeshFilter.sharedMesh.hideFlags = HideFlags.DontSave;
             Profiler.EndSample();
+        }
+
+        private static bool IsBorder(Vector3Int pos, Vector3Int vertexAmount)
+        {
+            return pos.x == 0 || pos.x == vertexAmount.x - 1 || pos.y == 0 || pos.y == vertexAmount.y - 1 || pos.z == 0 || pos.z == vertexAmount.z - 1;
         }
     }
 }

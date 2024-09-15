@@ -12,17 +12,20 @@ namespace WFCTD.GridManagement
         [SerializeField] private bool _visualizeSubVertices;
         [SerializeField] private float _gizmoSize = 0.075f;
         [SerializeField] private int _maxTriangles = -1;
-        private MarchingCubesVisualizer _marchingCubesVisualizer;
+        
+        protected MarchingCubesVisualizer _marchingCubesVisualizer;
         
         [field: SerializeField] public MeshFilter GridMeshFilter { get; private set; }
         [field: Range(0.01f,1f)]
         [field: SerializeField] public float Threshold { get; private set; } = 0.5f;
-        [field: Range(2, 100)]
+        [field: Range(2, 300)]
         [field: SerializeField] public int VertexAmountX { get; private set; } = 50;
-        [field: Range(2, 100)]
+        [field: Range(2, 300)]
         [field: SerializeField] public int VertexAmountY { get; private set; } = 50;
-        [field: Range(2, 100)]
+        [field: Range(2, 300)]
         [field: SerializeField] public int VertexAmountZ { get; private set; } = 50;
+
+        public virtual bool EnforceEmptyBorder => true;
 
         private void OnDrawGizmos()
         {
@@ -83,7 +86,7 @@ namespace WFCTD.GridManagement
                 return;
             }
             
-            _marchingCubesVisualizer.MarchCubes(GenerationProperties, vertexAmount, Threshold, GridMeshFilter, GetGridValue, _maxTriangles, _useLerp);
+            _marchingCubesVisualizer.MarchCubes(GenerationProperties, vertexAmount, Threshold, GridMeshFilter, GetGridValue, _maxTriangles, _useLerp, EnforceEmptyBorder);
         }
 
         public abstract float GetGridValue(int i, Vector3 position, GenerationProperties generationProperties);
