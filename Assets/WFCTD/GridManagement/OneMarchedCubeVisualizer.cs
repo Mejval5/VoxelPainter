@@ -21,7 +21,7 @@ namespace WFCTD.GridManagement
 
         [SerializeField] private MeshFilter _meshFilter;
 
-        private MarchingCubesVisualizer _marchingCubesVisualizer;
+        private MarchingCubesCpuVisualizer _marchingCubesCpuVisualizer;
 
 #pragma warning disable CS0414 // Field is assigned but its value is never used
         [SerializeField] private bool _regenerateMesh;
@@ -44,7 +44,7 @@ namespace WFCTD.GridManagement
         {
             _regenerateMesh = false;
          
-            _marchingCubesVisualizer ??= new MarchingCubesVisualizer();
+            _marchingCubesCpuVisualizer ??= new MarchingCubesCpuVisualizer();
             
             if (Cube == null || Cube.Corners.Length != MarchingCubeUtils.CornersPerCube)
             {
@@ -64,12 +64,12 @@ namespace WFCTD.GridManagement
             
             Vector3Int vertexAmount = new (2, 2, 2);
             GenerationProperties generationProperties = new ();
-            _marchingCubesVisualizer.MarchCubes(generationProperties, vertexAmount, _surface, _meshFilter, GetValue);
+            _marchingCubesCpuVisualizer.MarchCubes(generationProperties, vertexAmount, _surface, _meshFilter, GetValues);
         }
         
-        private float GetValue(int i, Vector3 position, GenerationProperties generationProperties)
+        private void GetValues(float[] verticesValues)
         {
-            return Cube.Corners[i].value;
+            Cube.Corners.Select(corner => corner.value).ToArray().CopyTo(verticesValues, 0);
         }
 
 #if UNITY_EDITOR

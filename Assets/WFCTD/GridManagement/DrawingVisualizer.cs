@@ -142,7 +142,7 @@ namespace WFCTD.GridManagement
                 && currentEvent.mousePosition.y <= sceneView.position.height)
             {
                 Profiler.BeginSample("Raycast");
-                hitInfo = VoxelRaycaster.RayMarch(ray, _rayMarchStepSize, Threshold, VertexAmountX, VertexAmountY, VertexAmountZ, _marchingCubesVisualizer.VerticesValues, transform.position);
+                hitInfo = VoxelRaycaster.RayMarch(ray, _rayMarchStepSize, Threshold, VertexAmountX, VertexAmountY, VertexAmountZ, _marchingCubesCpuVisualizer.VerticesValues, transform.position);
                 Profiler.EndSample();
             }
             
@@ -299,9 +299,15 @@ namespace WFCTD.GridManagement
             }
         }
 
-        public override float GetGridValue(int i, Vector3 position, GenerationProperties generationProperties)
+        public override void GetGridValues(float[] verticesValues)
         {
-            return _drawing[(int)position.x, (int)position.y, (int)position.z];
+            int floorSize = VertexAmountX * VertexAmountZ;
+            for (int i = 0; i < verticesValues.Length; i++)
+            {
+                Vector3Int pos = MarchingCubeUtils.ConvertIndexToPosition(i, floorSize, VertexAmount);
+                verticesValues[i] = _drawing[pos.x, pos.y, pos.z];
+            }
+            
         }
     }
 }

@@ -13,7 +13,8 @@ namespace WFCTD.GridManagement
         [SerializeField] private float _gizmoSize = 0.075f;
         [SerializeField] private int _maxTriangles = -1;
         
-        protected MarchingCubesVisualizer _marchingCubesVisualizer;
+        protected MarchingCubesCpuVisualizer _marchingCubesCpuVisualizer;
+        protected MarchingCubesGpuVisualizer _marchingCubesGpuVisualizer;
         
         [field: SerializeField] public MeshFilter GridMeshFilter { get; private set; }
         [field: Range(0.01f,1f)]
@@ -26,6 +27,8 @@ namespace WFCTD.GridManagement
         [field: SerializeField] public int VertexAmountZ { get; private set; } = 50;
 
         public virtual bool EnforceEmptyBorder => true;
+        
+        public Vector3Int VertexAmount => new (VertexAmountX, VertexAmountY, VertexAmountZ);
 
         private void OnDrawGizmos()
         {
@@ -42,9 +45,9 @@ namespace WFCTD.GridManagement
 
         private void VisualizeSubVertices()
         {
-            for (int i = 0; i < _marchingCubesVisualizer.SubVertices.Length; i++)
+            for (int i = 0; i < _marchingCubesCpuVisualizer.SubVertices.Length; i++)
             {
-                Vector3 pos = _marchingCubesVisualizer.SubVertices[i];
+                Vector3 pos = _marchingCubesCpuVisualizer.SubVertices[i];
                 if (pos == Vector3.zero)
                 {
                     continue;
@@ -57,11 +60,11 @@ namespace WFCTD.GridManagement
 
         private void VisualizeBaseVertices()
         {
-            for (int i = 0; i < _marchingCubesVisualizer.BaseVertices.Length; i++)
+            for (int i = 0; i < _marchingCubesCpuVisualizer.BaseVertices.Length; i++)
             {
-                Vector3 pos = _marchingCubesVisualizer.BaseVertices[i];
-                Gizmos.color = Color.Lerp(Color.black, Color.white, _marchingCubesVisualizer.VerticesValues[i]);
-                if (_marchingCubesVisualizer.VerticesValues[i] < Threshold)
+                Vector3 pos = _marchingCubesCpuVisualizer.BaseVertices[i];
+                Gizmos.color = Color.Lerp(Color.black, Color.white, _marchingCubesCpuVisualizer.VerticesValues[i]);
+                if (_marchingCubesCpuVisualizer.VerticesValues[i] < Threshold)
                 {
                     Gizmos.color *= Color.red;
                 }
@@ -77,7 +80,7 @@ namespace WFCTD.GridManagement
 
         protected virtual void GenerateMesh()
         {
-            _marchingCubesVisualizer ??= new MarchingCubesVisualizer();
+            _marchingCubesCpuVisualizer ??= new MarchingCubesCpuVisualizer();
             
             Vector3Int vertexAmount = new (VertexAmountX, VertexAmountY, VertexAmountZ);
             
@@ -86,9 +89,9 @@ namespace WFCTD.GridManagement
                 return;
             }
             
-            _marchingCubesVisualizer.MarchCubes(GenerationProperties, vertexAmount, Threshold, GridMeshFilter, GetGridValue, _maxTriangles, _useLerp, EnforceEmptyBorder);
+            _marchingCubesCpuVisualizer.MarchCubes(GenerationProperties, vertexAmount, Threshold, GridMeshFilter, GetGridValues, _maxTriangles, _useLerp, EnforceEmptyBorder);
         }
 
-        public abstract float GetGridValue(int i, Vector3 position, GenerationProperties generationProperties);
+        public abstract void GetGridValues(float[] verticesValues);
     }
 }

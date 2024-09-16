@@ -9,19 +9,7 @@ namespace WFCTD.GridManagement
         public const int CornersPerCube = 8;
         public const int EdgesPerCube = 12;
 
-        private static int _precomputedTriangleConnectionTableWidth = -1;
-        public static int PrecomputedTriangleConnectionTableWidth
-        {
-            get
-            {
-                if (_precomputedTriangleConnectionTableWidth == -1)
-                {
-                    _precomputedTriangleConnectionTableWidth = TriangleConnectionTable.GetLength(1);
-                }
-
-                return _precomputedTriangleConnectionTableWidth;
-            }
-        }
+        public const int TriangleConnectionTableWidth = 256;
 
         /// <summary>
         /// VertexOffset lists the positions, relative to vertex0, 
@@ -357,19 +345,28 @@ namespace WFCTD.GridManagement
             { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }
         };
         
+        public static Vector3Int ConvertIndexToPosition(int i, int floorSize, Vector3Int vertexAmount)
+        {
+            Vector3Int pos = Vector3Int.zero;
+            pos.x = i % vertexAmount.x;
+            pos.z  = (i % floorSize) / vertexAmount.x;
+            pos.y  = i / floorSize;
+            
+            return pos;
+        }
+        
         private static readonly int[] VerticesHolder = new int[EdgesPerCube];
         private static readonly int[] BaseVerticesHolder = new int[CornersPerCube];
         private static readonly float[] VerticesValuesHolder = new float[CornersPerCube];
         
-        public static int GetMarchedCube(
+        public static void GetMarchedCube(
             int[] baseVerticesOffsets, 
             float[] values, 
             int[] verticesOffsets, 
             float surface, 
             Vector3[] vertices, 
-            int[] triangles,
+            List<int> triangles,
             int baseIndexOffset,
-            int triangleCount,
             int x,
             int y,
             int z,
@@ -389,7 +386,7 @@ namespace WFCTD.GridManagement
             // Skip processing if cube is entirely inside or outside the surface
             if (cubeIndex is 0 or 255)
             {
-                return triangleCount;
+                return;
             }
             
             for (int i = 0; i < EdgesPerCube; i++)
@@ -417,7 +414,7 @@ namespace WFCTD.GridManagement
                 vertices[index].z = EdgeDirection[i, 2] * offset + CubeCornersPositions[startPointLocal, 2] + z;
             }
             
-            for (int i = 0; i < PrecomputedTriangleConnectionTableWidth - 1;)
+            for (int i = 0; i < TriangleConnectionTableWidth - 1;)
             {
                 int vertexIndex = TriangleConnectionTable[cubeIndex, i];
                 if (vertexIndex == -1)
@@ -440,13 +437,10 @@ namespace WFCTD.GridManagement
                     }
 
                     int localVertexIndex = TriangleConnectionTable[cubeIndex, offsetIndex + winding];
-                    triangles[triangleCount] = verticesOffsets[localVertexIndex];
-                    triangleCount++;
+                    triangles.Add(verticesOffsets[localVertexIndex]);
                     i++;
                 }
             }
-
-            return triangleCount;
         }
         
         public const int MaximumTrianglesPerCube = 5;

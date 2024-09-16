@@ -5,13 +5,21 @@ namespace WFCTD.GridManagement
     [ExecuteAlways]
     public class SimplexNoiseVisualizer : MarchingCubeRendererBase
     {
-        public override float GetGridValue(int i, Vector3 position, GenerationProperties generationProperties)
+        public override void GetGridValues(float[] verticesValues)
         {
-            float x = (position.x + generationProperties.Origin.x) * generationProperties.Frequency / 1000f;
-            float y = (position.y + generationProperties.Origin.y) * generationProperties.Frequency / 1000f;
-            float z = (position.z + generationProperties.Origin.z) * generationProperties.Frequency / 1000f;
-            
-            return CustomNoiseSimplex(x, y, z);
+            int floorSize = VertexAmountX * VertexAmountZ;
+            Vector3Int vertexAmount = VertexAmount;
+
+            for (int i = 0; i < verticesValues.Length; i++)
+            {
+                Vector3Int position =MarchingCubeUtils.ConvertIndexToPosition(i, floorSize, vertexAmount);
+                
+                float x = (position.x + GenerationProperties.Origin.x) * GenerationProperties.Frequency / 1000f;
+                float y = (position.y + GenerationProperties.Origin.y) * GenerationProperties.Frequency / 1000f;
+                float z = (position.z + GenerationProperties.Origin.z) * GenerationProperties.Frequency / 1000f;
+
+                verticesValues[i] = CustomNoiseSimplex(x, y, z);
+            }
         }
 
         private static float CustomNoiseSimplex(float x, float y, float z)

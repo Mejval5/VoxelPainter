@@ -9,21 +9,20 @@ using UnityEngine.Rendering;
 
 namespace WFCTD.GridManagement
 {
-    public class MarchingCubesVisualizer
+    public class MarchingCubesCpuVisualizer
     {
         public Vector3[] BaseVertices { get; private set; }
         public float[] VerticesValues { get; private set; }
-
         public Vector3[] SubVertices { get; private set; }
-        public int[] Triangles { get; private set; }
+        public List<int> Triangles { get; private set; }
         public int[] ValidTriangles { get; private set; }
 
         public void MarchCubes(
             GenerationProperties generationProperties, 
             Vector3Int vertexAmount, 
-            float surface, 
+            float threshold, 
             MeshFilter gridMeshFilter,
-            Func<int, Vector3, GenerationProperties, float> getVertexValue,
+            Action<float[]> getVertexValues,
             int maxTriangles = int.MaxValue,
             bool useLerp = true,
             bool enforceEmptyBorder = true)
@@ -62,39 +61,16 @@ namespace WFCTD.GridManagement
                 VerticesValues = new float[preAllocatedVerticesValues];
             }
             
-            for (int i = 0; i < preAllocatedVerticesValues; i++)
-            {
-                Vector3Int pos = Vector3Int.zero;
-                pos.x = i % vertexAmount.x;
-                pos.z  = (i % floorSize) / vertexAmount.x;
-                pos.y  = i / floorSize;
-
-                BaseVertices[i] = pos;
-                
-                if (enforceEmptyBorder)
-                {
-                    if (IsBorder(pos, vertexAmount))
-                    {
-                        VerticesValues[i] = 0;
-                        continue;
-                    }
-                }
-                
-                VerticesValues[i] = getVertexValue(i, pos, generationProperties);
-            }
-            
             // Triangle has 3 vertices
             int preAllocatedTriangles = amountOfCubes * MarchingCubeUtils.MaximumTrianglesPerCube * 3;
-            if (Triangles == null || preAllocatedTriangles != Triangles.Length)
+            if (Triangles == null || preAllocatedTriangles < Triangles.Count)
             {
-                Triangles = new int[preAllocatedTriangles];
+                Triangles = new List<int>(preAllocatedTriangles);
             }
-            
-            Array.Fill(Triangles, -1);
-            
-            Profiler.EndSample();
-            
-
+            else
+            {
+                Triangles.Clear();
+            }
             int[] baseVerticesOffsets =
             {
                 0, 1, floorSize + 1, floorSize, vertexAmount.x, vertexAmount.x + 1, vertexAmount.x + floorSize + 1, vertexAmount.x + floorSize
@@ -106,62 +82,42 @@ namespace WFCTD.GridManagement
             int[] verticesOffsets = new int[12];
 
             int cubeFloor = cubeAmountX * cubeAmountZ;
-            int triangleCount = 0;
+            Profiler.EndSample();
             
-            Profiler.BeginSample("MarchingCubesVisualizer.ConstructVertices");
-            for (int i = 0; i < amountOfCubes; i++)
+            Profiler.BeginSample("MarchingCubesVisualizer.FillVertices");
+            getVertexValues(VerticesValues);
+            
+            for (int i = 0; i < preAllocatedVerticesValues; i++)
             {
-                int xIndex = i % cubeAmountX;
-                int zIndex = (i % cubeFloor) / cubeAmountX;
-                int yIndex = i / cubeFloor;
-                
-                int indexOffset = xIndex + zIndex * (cubeAmountX + vertexAmount.x) + yIndex * topOffset;
-                int baseIndexOffset = xIndex + zIndex * vertexAmount.x + yIndex * floorSize;
-                
-                int middleIndexOffset = middleOffset - zIndex * cubeAmountX;
-                
-                // Front face
-                verticesOffsets[0] = indexOffset;
-                verticesOffsets[1] = indexOffset + middleIndexOffset + 1;
-                verticesOffsets[2] = indexOffset + topOffset;
-                verticesOffsets[3] = indexOffset + middleIndexOffset;
-                
-                // Back face
-                verticesOffsets[4] = indexOffset + cubeAmountX + vertexAmount.x;
-                verticesOffsets[5] = indexOffset + middleIndexOffset + vertexAmount.x + 1;
-                verticesOffsets[6] = indexOffset + topOffset + vertexAmount.x + cubeAmountX;
-                verticesOffsets[7] = indexOffset + middleIndexOffset + vertexAmount.x;
-                
-                // Middle face
-                verticesOffsets[8] = indexOffset + cubeAmountX;
-                verticesOffsets[9] = indexOffset + cubeAmountX + 1;
-                verticesOffsets[10] = indexOffset + topOffset + cubeAmountX + 1;
-                verticesOffsets[11] = indexOffset + topOffset + cubeAmountX;
+                Vector3Int pos = Vector3Int.zero;
+                pos.x = i % vertexAmount.x;
+                pos.z  = (i % floorSize) / vertexAmount.x;
+                pos.y  = i / floorSize;
 
-                triangleCount = MarchingCubeUtils.GetMarchedCube(
-                    baseVerticesOffsets, 
-                    VerticesValues, 
-                    verticesOffsets, 
-                    surface, 
-                    SubVertices, 
-                    Triangles,
-                    baseIndexOffset,
-                    triangleCount,
-                    xIndex,
-                    yIndex,
-                    zIndex,
-                    useLerp);
+                BaseVertices[i] = pos;
+
+                if (!enforceEmptyBorder)
+                {
+                    continue;
+                }
+
+                if (IsBorder(pos, vertexAmount))
+                {
+                    VerticesValues[i] = 0;
+                }
             }
+            Profiler.EndSample();
+
+            Profiler.BeginSample("MarchingCubesVisualizer.ConstructVertices");
+            MarchCubesOnCPU(vertexAmount, threshold, useLerp, amountOfCubes, cubeAmountX, cubeFloor, topOffset, floorSize, middleOffset, verticesOffsets, baseVerticesOffsets);
             Profiler.EndSample();
 
             Profiler.BeginSample("MarchingCubesVisualizer.PruneTriangles");
             int maxItemsToPick = maxTriangles * 3;
-            if (maxItemsToPick < 0 || maxItemsToPick > Triangles.Length)
+            if (maxItemsToPick < 0 || maxItemsToPick > Triangles.Count)
             {
-                maxItemsToPick = Triangles.Length;
+                maxItemsToPick = Triangles.Count;
             }
-            
-            maxItemsToPick = Mathf.Min(maxItemsToPick, triangleCount);
 
             // Create and fill the ValidTriangles array
             ValidTriangles = new int[maxItemsToPick];
@@ -197,6 +153,53 @@ namespace WFCTD.GridManagement
             gridMeshFilter.sharedMesh = sharedMesh;
             gridMeshFilter.sharedMesh.hideFlags = HideFlags.DontSave;
             Profiler.EndSample();
+        }
+
+        private void MarchCubesOnCPU(Vector3Int vertexAmount, float threshold, bool useLerp, int amountOfCubes, int cubeAmountX, int cubeFloor, int topOffset, int floorSize, int middleOffset,
+            int[] verticesOffsets, int[] baseVerticesOffsets)
+        {
+            for (int i = 0; i < amountOfCubes; i++)
+            {
+                int xIndex = i % cubeAmountX;
+                int zIndex = (i % cubeFloor) / cubeAmountX;
+                int yIndex = i / cubeFloor;
+                
+                int indexOffset = xIndex + zIndex * (cubeAmountX + vertexAmount.x) + yIndex * topOffset;
+                int baseIndexOffset = xIndex + zIndex * vertexAmount.x + yIndex * floorSize;
+                
+                int middleIndexOffset = middleOffset - zIndex * cubeAmountX;
+                
+                // Front face
+                verticesOffsets[0] = indexOffset;
+                verticesOffsets[1] = indexOffset + middleIndexOffset + 1;
+                verticesOffsets[2] = indexOffset + topOffset;
+                verticesOffsets[3] = indexOffset + middleIndexOffset;
+                
+                // Back face
+                verticesOffsets[4] = indexOffset + cubeAmountX + vertexAmount.x;
+                verticesOffsets[5] = indexOffset + middleIndexOffset + vertexAmount.x + 1;
+                verticesOffsets[6] = indexOffset + topOffset + vertexAmount.x + cubeAmountX;
+                verticesOffsets[7] = indexOffset + middleIndexOffset + vertexAmount.x;
+                
+                // Middle face
+                verticesOffsets[8] = indexOffset + cubeAmountX;
+                verticesOffsets[9] = indexOffset + cubeAmountX + 1;
+                verticesOffsets[10] = indexOffset + topOffset + cubeAmountX + 1;
+                verticesOffsets[11] = indexOffset + topOffset + cubeAmountX;
+
+                MarchingCubeUtils.GetMarchedCube(
+                    baseVerticesOffsets, 
+                    VerticesValues, 
+                    verticesOffsets, 
+                    threshold, 
+                    SubVertices, 
+                    Triangles,
+                    baseIndexOffset,
+                    xIndex,
+                    yIndex,
+                    zIndex,
+                    useLerp);
+            }
         }
 
         private static bool IsBorder(Vector3Int pos, Vector3Int vertexAmount)

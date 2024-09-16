@@ -72,68 +72,75 @@ namespace WFCTD.GridManagement
             GenerateMesh();
         }
         
-        public override float GetGridValue(int i, Vector3 position, GenerationProperties generationProperties)
+        public override void GetGridValues(float[] verticesValues)
         {
-            Profiler.BeginSample("GetGridValue");
-            // Ensure the texture is available
-            if (_videoFrameTexture == null)
-            {
-                return 0f;
-            }
-
-            // Get grid dimensions
-            int gridWidth = VertexAmountX;
-            int gridHeight = VertexAmountY;
-            int gridDepth = VertexAmountZ;
-
-            // Get video frame dimensions
-            int videoWidth = _videoFrameTexture.width;
-            int videoHeight = _videoFrameTexture.height;
-
-            // Compute aspect ratios
-            float gridAspectRatio = (float)gridWidth / gridHeight;
-            float videoAspectRatio = (float)videoWidth / videoHeight;
-
-            // Decide scaling based on the smaller dimension (fit height, crop sides)
-            float scale = (float)videoHeight / gridHeight;
-
-            // Compute the video width in grid units
-            float videoWidthInGridUnits = videoWidth / scale;
-
-            // Compute horizontal offset to center the video
-            float xOffset = (gridWidth - videoWidthInGridUnits) / 2f;
-
-            // Map grid position to video frame coordinates
-            float xRelativeToVideo = (position.x - xOffset) * scale;
-            float yRelativeToVideo = position.y * scale;
-
-            float finalValue = _invertOutput ? 1f : 0f;;
-            // Check if the position is within the video frame bounds
-            if (xRelativeToVideo >= 0 && xRelativeToVideo < videoWidth && yRelativeToVideo >= 0 && yRelativeToVideo < videoHeight)
-            {
-                // int pixelX = Mathf.Clamp((int)xRelativeToVideo, 0, videoWidth - 1);
-                // int pixelY = Mathf.Clamp((int)yRelativeToVideo, 0, videoHeight - 1);
-                //
-                // // Get the pixel color
-                // Color pixelColor = _videoFrameTexture.GetPixel(pixelX, pixelY);
-                
-                float value = SameplMipMaps(xRelativeToVideo, videoWidth, yRelativeToVideo, videoHeight);
-
-                float depth = value * gridDepth * _depthMultiplier;
-
-                if (gridDepth - position.z <= depth)
-                {
-                    finalValue = _invertOutput ? 1f - value : value;
-                }
-                else
-                {
-                    finalValue = _invertOutput ? 1f : 0f;
-                }
-            }
+            int floorSize = VertexAmountX * VertexAmountZ;
+            Vector3Int vertexAmount = VertexAmount;
             
-            Profiler.EndSample();
+            for (int i = 0; i < verticesValues.Length; i++)
+            {
+                Vector3 position = MarchingCubeUtils.ConvertIndexToPosition(i, floorSize, vertexAmount);
+                Profiler.BeginSample("GetGridValue");
+                // Ensure the texture is available
+                if (_videoFrameTexture == null)
+                {
+                    verticesValues[i] = 0f;
+                    continue;
+                }
 
-            return finalValue;
+                // Get grid dimensions
+                int gridWidth = VertexAmountX;
+                int gridHeight = VertexAmountY;
+                int gridDepth = VertexAmountZ;
+
+                // Get video frame dimensions
+                int videoWidth = _videoFrameTexture.width;
+                int videoHeight = _videoFrameTexture.height;
+
+                // Compute aspect ratios
+                float gridAspectRatio = (float)gridWidth / gridHeight;
+                float videoAspectRatio = (float)videoWidth / videoHeight;
+
+                // Decide scaling based on the smaller dimension (fit height, crop sides)
+                float scale = (float)videoHeight / gridHeight;
+
+                // Compute the video width in grid units
+                float videoWidthInGridUnits = videoWidth / scale;
+
+                // Compute horizontal offset to center the video
+                float xOffset = (gridWidth - videoWidthInGridUnits) / 2f;
+
+                // Map grid position to video frame coordinates
+                float xRelativeToVideo = (position.x - xOffset) * scale;
+                float yRelativeToVideo = position.y * scale;
+
+                float finalValue = _invertOutput ? 1f : 0f;;
+                // Check if the position is within the video frame bounds
+                if (xRelativeToVideo >= 0 && xRelativeToVideo < videoWidth && yRelativeToVideo >= 0 && yRelativeToVideo < videoHeight)
+                {
+                    // int pixelX = Mathf.Clamp((int)xRelativeToVideo, 0, videoWidth - 1);
+                    // int pixelY = Mathf.Clamp((int)yRelativeToVideo, 0, videoHeight - 1);
+                    //
+                    // // Get the pixel color
+                    // Color pixelColor = _videoFrameTexture.GetPixel(pixelX, pixelY);
+                    
+                    float value = SameplMipMaps(xRelativeToVideo, videoWidth, yRelativeToVideo, videoHeight);
+
+                    float depth = value * gridDepth * _depthMultiplier;
+
+                    if (gridDepth - position.z <= depth)
+                    {
+                        finalValue = _invertOutput ? 1f - value : value;
+                    }
+                    else
+                    {
+                        finalValue = _invertOutput ? 1f : 0f;
+                    }
+                }
+                
+                Profiler.EndSample();
+                verticesValues[i] = finalValue;
+            }
         }
 
         private float SameplMipMaps(float xRelativeToVideo, int videoWidth, float yRelativeToVideo, int videoHeight)

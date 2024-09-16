@@ -4,13 +4,20 @@ namespace WFCTD.GridManagement
 {
     public class TrigVisualizer : MarchingCubeRendererBase
     {
-        public override float GetGridValue(int i, Vector3 position, GenerationProperties generationProperties)
+        public override void GetGridValues(float[] verticesValues)
         {
-            float x = (position.x + generationProperties.Origin.x) * generationProperties.Frequency / 1000f;
-            float y = (position.y + generationProperties.Origin.y) * generationProperties.Frequency / 1000f;
-            float z = (position.z + generationProperties.Origin.z) * generationProperties.Frequency / 1000f;
+            int floorSize = VertexAmountX * VertexAmountZ;
+            Vector3Int vertexAmount = VertexAmount;
+
+            for (int i = 0; i < verticesValues.Length; i++)
+            {
+                Vector3Int position = MarchingCubeUtils.ConvertIndexToPosition(i, floorSize, vertexAmount);
+                float x = (position.x + GenerationProperties.Origin.x) * GenerationProperties.Frequency / 1000f;
+                float y = (position.y + GenerationProperties.Origin.y) * GenerationProperties.Frequency / 1000f;
+                float z = (position.z + GenerationProperties.Origin.z) * GenerationProperties.Frequency / 1000f;
             
-            return (Mathf.Sin(x) + Mathf.Cos(y) + Mathf.Cos(z) + 3) / 6f;
+                verticesValues[i] = (Mathf.Sin(x) + Mathf.Cos(y) + Mathf.Cos(z) + 3) / 6f;
+            }
         }
     }
 }
