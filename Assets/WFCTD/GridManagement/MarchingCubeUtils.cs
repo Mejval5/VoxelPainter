@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Profiling;
 
@@ -355,13 +356,9 @@ namespace WFCTD.GridManagement
             return pos;
         }
         
-        private static readonly int[] VerticesHolder = new int[EdgesPerCube];
-        private static readonly int[] BaseVerticesHolder = new int[CornersPerCube];
-        private static readonly float[] VerticesValuesHolder = new float[CornersPerCube];
-        
         public static void GetMarchedCube(
             int[] baseVerticesOffsets, 
-            float[] values, 
+            NativeArray<float> values, 
             int[] verticesOffsets, 
             float surface, 
             Vector3[] vertices, 

@@ -1,11 +1,12 @@
-﻿using UnityEngine;
+﻿using Unity.Collections;
+using UnityEngine;
 
 namespace WFCTD.GridManagement
 {
     [ExecuteAlways]
     public class SimplexNoiseVisualizer : MarchingCubeRendererBase
     {
-        public override void GetGridValues(float[] verticesValues)
+        public override void GetVertexValues(NativeArray<float> verticesValues)
         {
             int floorSize = VertexAmountX * VertexAmountZ;
             Vector3Int vertexAmount = VertexAmount;

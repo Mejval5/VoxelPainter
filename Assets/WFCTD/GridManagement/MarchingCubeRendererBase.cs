@@ -1,4 +1,5 @@
 ﻿
+using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 
@@ -16,6 +17,11 @@ namespace WFCTD.GridManagement
         protected MarchingCubesCpuVisualizer _marchingCubesCpuVisualizer;
         protected MarchingCubesGpuVisualizer _marchingCubesGpuVisualizer;
         
+        protected IMarchingCubesVisualizer MarchingCubesVisualizer { get; private set; }
+        
+        [field: SerializeField] public bool UseGpu { get; private set; }
+        [field: SerializeField] public ComputeShader MarchingCubeComputeShader { get; private set; }
+        
         [field: SerializeField] public MeshFilter GridMeshFilter { get; private set; }
         [field: Range(0.01f,1f)]
         [field: SerializeField] public float Threshold { get; private set; } = 0.5f;
@@ -25,8 +31,7 @@ namespace WFCTD.GridManagement
         [field: SerializeField] public int VertexAmountY { get; private set; } = 50;
         [field: Range(2, 300)]
         [field: SerializeField] public int VertexAmountZ { get; private set; } = 50;
-
-        public virtual bool EnforceEmptyBorder => true;
+        [field: SerializeField]  public virtual bool EnforceEmptyBorder { get; private set; } = true;
         
         public Vector3Int VertexAmount => new (VertexAmountX, VertexAmountY, VertexAmountZ);
 
@@ -45,7 +50,7 @@ namespace WFCTD.GridManagement
 
         private void VisualizeSubVertices()
         {
-            for (int i = 0; i < _marchingCubesCpuVisualizer.SubVertices.Length; i++)
+            for (int i = 0; i < MarchingCubesVisualizer.SubVertices.Length; i++)
             {
                 Vector3 pos = _marchingCubesCpuVisualizer.SubVertices[i];
                 if (pos == Vector3.zero)
@@ -60,11 +65,11 @@ namespace WFCTD.GridManagement
 
         private void VisualizeBaseVertices()
         {
-            for (int i = 0; i < _marchingCubesCpuVisualizer.BaseVertices.Length; i++)
+            for (int i = 0; i < _marchingCubesCpuVisualizer.BaseVerticesNative.Length; i++)
             {
-                Vector3 pos = _marchingCubesCpuVisualizer.BaseVertices[i];
-                Gizmos.color = Color.Lerp(Color.black, Color.white, _marchingCubesCpuVisualizer.VerticesValues[i]);
-                if (_marchingCubesCpuVisualizer.VerticesValues[i] < Threshold)
+                Vector3 pos = _marchingCubesCpuVisualizer.BaseVerticesNative[i];
+                Gizmos.color = Color.Lerp(Color.black, Color.white, _marchingCubesCpuVisualizer.VerticesValuesNative[i]);
+                if (_marchingCubesCpuVisualizer.VerticesValuesNative[i] < Threshold)
                 {
                     Gizmos.color *= Color.red;
                 }
@@ -80,18 +85,30 @@ namespace WFCTD.GridManagement
 
         protected virtual void GenerateMesh()
         {
-            _marchingCubesCpuVisualizer ??= new MarchingCubesCpuVisualizer();
-            
-            Vector3Int vertexAmount = new (VertexAmountX, VertexAmountY, VertexAmountZ);
-            
             if (GridMeshFilter == null)
             {
                 return;
             }
             
-            _marchingCubesCpuVisualizer.MarchCubes(GenerationProperties, vertexAmount, Threshold, GridMeshFilter, GetGridValues, _maxTriangles, _useLerp, EnforceEmptyBorder);
+            Vector3Int vertexAmount = new (VertexAmountX, VertexAmountY, VertexAmountZ);
+            
+            if (UseGpu)
+            {
+                _marchingCubesGpuVisualizer ??= new MarchingCubesGpuVisualizer();
+                MarchingCubesVisualizer = _marchingCubesGpuVisualizer;
+                _marchingCubesGpuVisualizer.MarchCubes(GenerationProperties, vertexAmount, Threshold, GridMeshFilter, 
+                    GetVertexValues, MarchingCubeComputeShader, _maxTriangles, _useLerp, EnforceEmptyBorder);
+            }
+            else
+            {
+                _marchingCubesCpuVisualizer ??= new MarchingCubesCpuVisualizer();
+                MarchingCubesVisualizer = _marchingCubesCpuVisualizer;
+                _marchingCubesCpuVisualizer.MarchCubes(GenerationProperties, vertexAmount, Threshold, GridMeshFilter, 
+                    GetVertexValues, _maxTriangles, _useLerp, EnforceEmptyBorder);
+            }
+            
         }
 
-        public abstract void GetGridValues(float[] verticesValues);
+        public abstract void GetVertexValues(NativeArray<float> verticesValues);
     }
 }

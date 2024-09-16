@@ -1,4 +1,5 @@
 ﻿using System;
+using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Profiling;
@@ -142,7 +143,7 @@ namespace WFCTD.GridManagement
                 && currentEvent.mousePosition.y <= sceneView.position.height)
             {
                 Profiler.BeginSample("Raycast");
-                hitInfo = VoxelRaycaster.RayMarch(ray, _rayMarchStepSize, Threshold, VertexAmountX, VertexAmountY, VertexAmountZ, _marchingCubesCpuVisualizer.VerticesValues, transform.position);
+                hitInfo = VoxelRaycaster.RayMarch(ray, _rayMarchStepSize, Threshold, VertexAmountX, VertexAmountY, VertexAmountZ, _marchingCubesCpuVisualizer.VerticesValuesNative, transform.position);
                 Profiler.EndSample();
             }
             
@@ -299,7 +300,7 @@ namespace WFCTD.GridManagement
             }
         }
 
-        public override void GetGridValues(float[] verticesValues)
+        public override void GetVertexValues(NativeArray<float> verticesValues)
         {
             int floorSize = VertexAmountX * VertexAmountZ;
             for (int i = 0; i < verticesValues.Length; i++)

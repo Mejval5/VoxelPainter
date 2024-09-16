@@ -7,7 +7,7 @@ using UnityEngine.Rendering;
 
 namespace WFCTD.GridManagement
 {
-    public class MarchingCubesGpuVisualizer
+    public class MarchingCubesGpuVisualizer : IMarchingCubesVisualizer
     {
         private const string ComputeShaderProgram = "CSMain";
 
@@ -26,13 +26,16 @@ namespace WFCTD.GridManagement
         private static readonly int Offsets = Shader.PropertyToID("Offsets");
         private static readonly int UseLerp = Shader.PropertyToID("UseLerp");
         private static readonly int Threshold = Shader.PropertyToID("Threshold");
-        private static readonly int SubVertices = Shader.PropertyToID("SubVertices");
+        private static readonly int SubVerticesShaderKey = Shader.PropertyToID("SubVertices");
         private static readonly int BaseVerticesValues = Shader.PropertyToID("BaseVerticesValues");
         private static readonly int EnforceEmptyBorder = Shader.PropertyToID("EnforceEmptyBorder");
-        public ComputeShader ComputeShader { get; set; }
+
+        public NativeArray<float> VerticesValuesNative;
+        public NativeArray<Vector3> BaseVerticesNative;
+        public Vector3[] SubVertices { get; private set; }
         
-        public NativeArray<float> VerticesValuesNative { get; set; }
-        public NativeArray<Vector3> BaseVerticesNative { get; set; }
+        public NativeArray<float> ReadOnlyTrianglesNative => VerticesValuesNative;
+        public NativeArray<Vector3> ReadOnlyBaseVertices => BaseVerticesNative;
         
         private ComputeBuffer _appendedTrianglesBuffer;
         private ComputeBuffer _subVerticesBuffer;
@@ -44,6 +47,7 @@ namespace WFCTD.GridManagement
             float threshold, 
             MeshFilter gridMeshFilter,
             Action<NativeArray<float>> getVertexValues,
+            ComputeShader computeShader,
             int maxTriangles = int.MaxValue,
             bool useLerp = true,
             bool enforceEmptyBorder = true)
@@ -90,11 +94,12 @@ namespace WFCTD.GridManagement
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.InjectDataIntoComputeShader");
-            InjectDataIntoComputeShader(vertexAmount, threshold, useLerp, floorSize, cubeAmountX, cubeAmountY, cubeAmountZ, cubeFloorSize, middleOffset, topOffset, enforceEmptyBorder);
+            InjectDataIntoComputeShader(vertexAmount, threshold, useLerp, floorSize, cubeAmountX, cubeAmountY, 
+                cubeAmountZ, cubeFloorSize, middleOffset, topOffset, enforceEmptyBorder, computeShader);
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.MarchCubes");
-            DispatchComputeShader(amountOfCubes);
+            DispatchComputeShader(amountOfCubes, computeShader);
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.GetResults");
@@ -122,8 +127,8 @@ namespace WFCTD.GridManagement
             int[] triangleIndices = new int[count];
             _appendedTrianglesBuffer.GetData(triangleIndices, 0, 0, triangleTakeCount);
             
-            Vector3[] vertices = new Vector3[count];
-            _subVerticesBuffer.GetData(vertices, 0, 0, preAllocatedSubVertices);
+            SubVertices = new Vector3[count];
+            _subVerticesBuffer.GetData(SubVertices, 0, 0, preAllocatedSubVertices);
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.FillMesh");
@@ -132,42 +137,42 @@ namespace WFCTD.GridManagement
             {
                 sharedMesh = new Mesh
                 {
-                    indexFormat = vertices.Length > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16
+                    indexFormat = SubVertices.Length > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16
                 };
             }
 
             sharedMesh.MarkDynamic();
-            sharedMesh.vertices = vertices;
+            sharedMesh.vertices = SubVertices;
             sharedMesh.triangles = triangleIndices;
             sharedMesh.RecalculateBounds();
             Profiler.EndSample();
         }
 
         private void InjectDataIntoComputeShader(Vector3Int vertexAmount, float threshold, bool useLerp, int floorSize, int cubeAmountX, int cubeAmountY, int cubeAmountZ, int cubeFloorSize, int middleOffset,
-            int topOffset, bool enforceEmptyBorder)
+            int topOffset, bool enforceEmptyBorder, ComputeShader computeShader)
         {
             // Set the buffer on the compute shader
-            int kernelHandle = ComputeShader.FindKernel(ComputeShaderProgram);
-            ComputeShader.SetBuffer(kernelHandle, AppendedTriangles, _appendedTrianglesBuffer);
-            ComputeShader.SetBuffer(kernelHandle, SubVertices, _subVerticesBuffer);
-            ComputeShader.SetBuffer(kernelHandle, BaseVerticesValues, _baseVerticesValuesBuffer);
+            int kernelHandle = computeShader.FindKernel(ComputeShaderProgram);
+            computeShader.SetBuffer(kernelHandle, AppendedTriangles, _appendedTrianglesBuffer);
+            computeShader.SetBuffer(kernelHandle, SubVerticesShaderKey, _subVerticesBuffer);
+            computeShader.SetBuffer(kernelHandle, BaseVerticesValues, _baseVerticesValuesBuffer);
             
-            ComputeShader.SetInts(VertexAmount, vertexAmount.x, vertexAmount.y, vertexAmount.z, floorSize);
-            ComputeShader.SetInts(CubeAmount, cubeAmountX, cubeAmountY, cubeAmountZ, cubeFloorSize);
-            ComputeShader.SetInts(Offsets, middleOffset, topOffset);
-            ComputeShader.SetBool(UseLerp, useLerp);
-            ComputeShader.SetBool(EnforceEmptyBorder, enforceEmptyBorder);
-            ComputeShader.SetFloat(Threshold, threshold);
+            computeShader.SetInts(VertexAmount, vertexAmount.x, vertexAmount.y, vertexAmount.z, floorSize);
+            computeShader.SetInts(CubeAmount, cubeAmountX, cubeAmountY, cubeAmountZ, cubeFloorSize);
+            computeShader.SetInts(Offsets, middleOffset, topOffset);
+            computeShader.SetBool(UseLerp, useLerp);
+            computeShader.SetBool(EnforceEmptyBorder, enforceEmptyBorder);
+            computeShader.SetFloat(Threshold, threshold);
         }
 
-        private void DispatchComputeShader(int amountOfCubes)
+        private void DispatchComputeShader(int amountOfCubes, ComputeShader computeShader)
         {
-            int kernelHandle = ComputeShader.FindKernel(ComputeShaderProgram);
+            int kernelHandle = computeShader.FindKernel(ComputeShaderProgram);
             // Dispatch the compute shader
-            ComputeShader.GetKernelThreadGroupSizes(kernelHandle, out uint xSize, out _, out _);
+            computeShader.GetKernelThreadGroupSizes(kernelHandle, out uint xSize, out _, out _);
             int threadSizeX = (int)xSize;
             int threadGroupsX = (amountOfCubes + threadSizeX - 1) / threadSizeX;
-            ComputeShader.Dispatch(kernelHandle, threadGroupsX, 1, 1);
+            computeShader.Dispatch(kernelHandle, threadGroupsX, 1, 1);
         }
 
         private void SetupBaseVerticesValuesBuffer(int preAllocatedBaseVertices, bool recalculateVertexValues)
@@ -203,9 +208,9 @@ namespace WFCTD.GridManagement
             // Initialize the AppendStructuredBuffer with an initial capacity
             // Here, assuming a maximum of 300 indices (100 triangles)
             int preAllocatedTriangles = amountOfCubes * MarchingCubeUtils.MaximumTrianglesPerCube * 3;
-            if (_appendedTrianglesBuffer.count < preAllocatedTriangles)
+            if (_appendedTrianglesBuffer == null || _appendedTrianglesBuffer.count < preAllocatedTriangles)
             {
-                _appendedTrianglesBuffer.Dispose();
+                _appendedTrianglesBuffer?.Dispose();
                 _appendedTrianglesBuffer = new ComputeBuffer(preAllocatedTriangles, strideInt, ComputeBufferType.Append);
             }
             else
@@ -219,6 +224,9 @@ namespace WFCTD.GridManagement
             _appendedTrianglesBuffer?.Dispose();
             _subVerticesBuffer?.Dispose();
             _baseVerticesValuesBuffer?.Dispose();
+            
+            VerticesValuesNative.Dispose();
+            BaseVerticesNative.Dispose();
         }
         
         ~MarchingCubesGpuVisualizer()

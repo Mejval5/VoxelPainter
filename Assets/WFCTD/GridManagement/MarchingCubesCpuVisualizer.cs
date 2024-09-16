@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Profiling;
@@ -9,20 +10,23 @@ using UnityEngine.Rendering;
 
 namespace WFCTD.GridManagement
 {
-    public class MarchingCubesCpuVisualizer
+    public class MarchingCubesCpuVisualizer : IMarchingCubesVisualizer
     {
-        public Vector3[] BaseVertices { get; private set; }
-        public float[] VerticesValues { get; private set; }
+        public NativeArray<float> VerticesValuesNative;
+        public NativeArray<Vector3> BaseVerticesNative;
         public Vector3[] SubVertices { get; private set; }
         public List<int> Triangles { get; private set; }
         public int[] ValidTriangles { get; private set; }
 
+        public NativeArray<float> ReadOnlyTrianglesNative => VerticesValuesNative;
+        public NativeArray<Vector3> ReadOnlyBaseVertices => BaseVerticesNative;
+        
         public void MarchCubes(
             GenerationProperties generationProperties, 
             Vector3Int vertexAmount, 
             float threshold, 
             MeshFilter gridMeshFilter,
-            Action<float[]> getVertexValues,
+            Action<NativeArray<float>> getVertexValues,
             int maxTriangles = int.MaxValue,
             bool useLerp = true,
             bool enforceEmptyBorder = true)
@@ -54,11 +58,11 @@ namespace WFCTD.GridManagement
                 Array.Fill(SubVertices, Vector3.zero);
             }
             
-            bool recalculateVertexValues = VerticesValues == null || preAllocatedVerticesValues != VerticesValues.Length;
+            bool recalculateVertexValues = VerticesValuesNative.IsCreated == false || preAllocatedVerticesValues != VerticesValuesNative.Length;
             if (recalculateVertexValues)
             {
-                BaseVertices = new Vector3[preAllocatedVerticesValues];
-                VerticesValues = new float[preAllocatedVerticesValues];
+                BaseVerticesNative = new NativeArray<Vector3>(preAllocatedVerticesValues, Allocator.Persistent);
+                VerticesValuesNative = new NativeArray<float>(preAllocatedVerticesValues, Allocator.Persistent);
             }
             
             // Triangle has 3 vertices
@@ -85,7 +89,7 @@ namespace WFCTD.GridManagement
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.FillVertices");
-            getVertexValues(VerticesValues);
+            getVertexValues(VerticesValuesNative);
             
             for (int i = 0; i < preAllocatedVerticesValues; i++)
             {
@@ -94,7 +98,7 @@ namespace WFCTD.GridManagement
                 pos.z  = (i % floorSize) / vertexAmount.x;
                 pos.y  = i / floorSize;
 
-                BaseVertices[i] = pos;
+                BaseVerticesNative[i] = pos;
 
                 if (!enforceEmptyBorder)
                 {
@@ -103,7 +107,7 @@ namespace WFCTD.GridManagement
 
                 if (IsBorder(pos, vertexAmount))
                 {
-                    VerticesValues[i] = 0;
+                    VerticesValuesNative[i] = 0;
                 }
             }
             Profiler.EndSample();
@@ -189,7 +193,7 @@ namespace WFCTD.GridManagement
 
                 MarchingCubeUtils.GetMarchedCube(
                     baseVerticesOffsets, 
-                    VerticesValues, 
+                    VerticesValuesNative, 
                     verticesOffsets, 
                     threshold, 
                     SubVertices, 
@@ -205,6 +209,17 @@ namespace WFCTD.GridManagement
         private static bool IsBorder(Vector3Int pos, Vector3Int vertexAmount)
         {
             return pos.x == 0 || pos.x == vertexAmount.x - 1 || pos.y == 0 || pos.y == vertexAmount.y - 1 || pos.z == 0 || pos.z == vertexAmount.z - 1;
+        }
+        
+        public void ReleaseBuffers()
+        {
+            VerticesValuesNative.Dispose();
+            BaseVerticesNative.Dispose();
+        }
+        
+        ~MarchingCubesCpuVisualizer()
+        {
+            ReleaseBuffers();
         }
     }
 }

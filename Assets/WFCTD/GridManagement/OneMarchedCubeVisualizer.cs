@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
+using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 
@@ -64,12 +65,12 @@ namespace WFCTD.GridManagement
             
             Vector3Int vertexAmount = new (2, 2, 2);
             GenerationProperties generationProperties = new ();
-            _marchingCubesCpuVisualizer.MarchCubes(generationProperties, vertexAmount, _surface, _meshFilter, GetValues);
+            _marchingCubesCpuVisualizer.MarchCubes(generationProperties, vertexAmount, _surface, _meshFilter, GetVertexValues);
         }
         
-        private void GetValues(float[] verticesValues)
+        private void GetVertexValues(NativeArray<float> verticesValues)
         {
-            Cube.Corners.Select(corner => corner.value).ToArray().CopyTo(verticesValues, 0);
+            verticesValues.CopyFrom(Cube.Corners.Select(corner => corner.value).ToArray());
         }
 
 #if UNITY_EDITOR

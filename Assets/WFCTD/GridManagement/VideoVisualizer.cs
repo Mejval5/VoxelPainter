@@ -1,4 +1,5 @@
 ﻿using System;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Serialization;
@@ -72,7 +73,7 @@ namespace WFCTD.GridManagement
             GenerateMesh();
         }
         
-        public override void GetGridValues(float[] verticesValues)
+        public override void GetVertexValues(NativeArray<float> verticesValues)
         {
             int floorSize = VertexAmountX * VertexAmountZ;
             Vector3Int vertexAmount = VertexAmount;
@@ -97,10 +98,6 @@ namespace WFCTD.GridManagement
                 int videoWidth = _videoFrameTexture.width;
                 int videoHeight = _videoFrameTexture.height;
 
-                // Compute aspect ratios
-                float gridAspectRatio = (float)gridWidth / gridHeight;
-                float videoAspectRatio = (float)videoWidth / videoHeight;
-
                 // Decide scaling based on the smaller dimension (fit height, crop sides)
                 float scale = (float)videoHeight / gridHeight;
 
@@ -114,16 +111,11 @@ namespace WFCTD.GridManagement
                 float xRelativeToVideo = (position.x - xOffset) * scale;
                 float yRelativeToVideo = position.y * scale;
 
-                float finalValue = _invertOutput ? 1f : 0f;;
+                float finalValue = _invertOutput ? 1f : 0f;
+                
                 // Check if the position is within the video frame bounds
                 if (xRelativeToVideo >= 0 && xRelativeToVideo < videoWidth && yRelativeToVideo >= 0 && yRelativeToVideo < videoHeight)
                 {
-                    // int pixelX = Mathf.Clamp((int)xRelativeToVideo, 0, videoWidth - 1);
-                    // int pixelY = Mathf.Clamp((int)yRelativeToVideo, 0, videoHeight - 1);
-                    //
-                    // // Get the pixel color
-                    // Color pixelColor = _videoFrameTexture.GetPixel(pixelX, pixelY);
-                    
                     float value = SameplMipMaps(xRelativeToVideo, videoWidth, yRelativeToVideo, videoHeight);
 
                     float depth = value * gridDepth * _depthMultiplier;

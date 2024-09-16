@@ -1,6 +1,7 @@
 ﻿#include "PrecomputedTables.hlsl"
 
 #pragma kernel CSMain
+#pragma target 6.0
 
 // Define the main compute function
 // Using AppendStructuredBuffer<int> for triangle indices
@@ -15,15 +16,6 @@ bool UseLerp;
 bool EnforceEmptyBorder;
 float Threshold;
 
-float GetValue(int i, int x, int y, int z)
-{
-    if (EnforceEmptyBorder && (x == 0 || y == 0 || z == 0 || x == CubeAmount.x - 1 || y == CubeAmount.y - 1 || z == CubeAmount.z - 1))
-    {
-        return 0;
-    }
-    
-    return BaseVerticesValues[i];
-}
 
 void GetMarchedCube(
     inout int baseVerticesOffsets[8],
@@ -34,13 +26,13 @@ void GetMarchedCube(
     int z)
 {
     int cubeIndex = 0;
-    for (int cubeIndex = 0; cubeIndex < CornersPerCube; cubeIndex++)
+    for (int index = 0; index < CornersPerCube; index++)
     {
-        float value = GetValue(baseVerticesOffsets[cubeIndex] + baseIndexOffset, x, y, z);
+        float value = BaseVerticesValues[baseVerticesOffsets[index] + baseIndexOffset];
         
         if (value > Threshold)
         {
-            cubeIndex |= 1 << cubeIndex;
+            index |= 1 << index;
         }
     }
     
@@ -60,8 +52,8 @@ void GetMarchedCube(
         int startPoint = baseVerticesOffsets[startPointLocal] + baseIndexOffset;
         int endPoint = baseVerticesOffsets[endPointLocal] + baseIndexOffset;
         
-        float startValue = GetValue(startPoint, x, y, z);
-        float endValue = GetValue(endPoint, x, y, z);
+        float startValue = BaseVerticesValues[startPoint];
+        float endValue = BaseVerticesValues[endPoint];
         
         bool hasCrossing = (cubeEdgeFlags & (1 << edgeIndex)) != 0;
 

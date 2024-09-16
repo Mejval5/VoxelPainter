@@ -1,9 +1,10 @@
-﻿using UnityEngine;
+﻿using Unity.Collections;
+using UnityEngine;
 using WFCTD.GridManagement;
 
 public static class VoxelRaycaster
 {
-    public static HitMeshInfo RayMarch(Ray ray, float stepSize, float threshold, int vertexAmountX, int vertexAmountY, int vertexAmountZ, float[] verticesValues, Vector3 gridOrigin)
+    public static HitMeshInfo RayMarch(Ray ray, float stepSize, float threshold, int vertexAmountX, int vertexAmountY, int vertexAmountZ, NativeArray<float> verticesValues, Vector3 gridOrigin)
     {
         HitMeshInfo hitInfo = new HitMeshInfo();
         Vector3 gridSpacing = new Vector3(1f, 1f, 1f);
@@ -83,7 +84,7 @@ public static class VoxelRaycaster
         return true;
     }
 
-    private static float SampleScalarField(Vector3 position, int vertexAmountX, int vertexAmountY, int vertexAmountZ, float[] verticesValues, Vector3 gridOrigin, Vector3 gridSpacing, bool detectSmallFeatures = false)
+    private static float SampleScalarField(Vector3 position, int vertexAmountX, int vertexAmountY, int vertexAmountZ, NativeArray<float> verticesValues, Vector3 gridOrigin, Vector3 gridSpacing, bool detectSmallFeatures = false)
     {
         // Convert world position to grid indices
         Vector3 localPos = position - gridOrigin;
@@ -143,7 +144,7 @@ public static class VoxelRaycaster
 
     }
 
-    private static Vector3 RefineIntersection(Ray ray, Vector3 start, Vector3 end, float threshold, int vertexAmountX, int vertexAmountY, int vertexAmountZ, float[] verticesValues, Vector3 gridOrigin, Vector3 gridSpacing)
+    private static Vector3 RefineIntersection(Ray ray, Vector3 start, Vector3 end, float threshold, int vertexAmountX, int vertexAmountY, int vertexAmountZ, NativeArray<float> verticesValues, Vector3 gridOrigin, Vector3 gridSpacing)
     {
         const int maxIterations = 10;
         const float tolerance = 1e-4f;

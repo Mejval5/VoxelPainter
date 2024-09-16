@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using Unity.Collections;
+using UnityEngine;
 
 namespace WFCTD.GridManagement
 {
@@ -7,7 +8,7 @@ namespace WFCTD.GridManagement
         [Range(0f, 200f)]
         [SerializeField] private float _planetSurface;
         
-        public override void GetGridValues(float[] verticesValues)
+        public override void GetVertexValues(NativeArray<float> verticesValues)
         {
             int floorSize = VertexAmountX * VertexAmountZ;
             Vector3Int vertexAmount = VertexAmount;
