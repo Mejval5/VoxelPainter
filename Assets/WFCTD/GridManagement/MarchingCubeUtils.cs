@@ -10,7 +10,7 @@ namespace WFCTD.GridManagement
         public const int CornersPerCube = 8;
         public const int EdgesPerCube = 12;
 
-        public const int TriangleConnectionTableWidth = 256;
+        public const int TriangleConnectionTableWidth = 16;
 
         /// <summary>
         /// VertexOffset lists the positions, relative to vertex0, 
@@ -355,6 +355,11 @@ namespace WFCTD.GridManagement
             
             return pos;
         }
+
+        public static bool IsBorder(Vector3Int pos, Vector3Int vertexAmount)
+        {
+            return pos.x == 0 || pos.x == vertexAmount.x - 1 || pos.y == 0 || pos.y == vertexAmount.y - 1 || pos.z == 0 || pos.z == vertexAmount.z - 1;
+        }
         
         public static void GetMarchedCube(
             int[] baseVerticesOffsets, 
@@ -378,13 +383,13 @@ namespace WFCTD.GridManagement
                 }
             }
             
-            int cubeEdgeFlags = CubeEdgeFlags[cubeIndex];
-            
             // Skip processing if cube is entirely inside or outside the surface
             if (cubeIndex is 0 or 255)
             {
                 return;
             }
+            
+            int cubeEdgeFlags = CubeEdgeFlags[cubeIndex];
             
             for (int i = 0; i < EdgesPerCube; i++)
             {
@@ -411,7 +416,7 @@ namespace WFCTD.GridManagement
                 vertices[index].z = EdgeDirection[i, 2] * offset + CubeCornersPositions[startPointLocal, 2] + z;
             }
             
-            for (int i = 0; i < TriangleConnectionTableWidth - 1;)
+            for (int i = 0; i < TriangleConnectionTableWidth;)
             {
                 int vertexIndex = TriangleConnectionTable[cubeIndex, i];
                 if (vertexIndex == -1)

@@ -18,7 +18,7 @@ namespace WFCTD.GridManagement
         public List<int> Triangles { get; private set; }
         public int[] ValidTriangles { get; private set; }
 
-        public NativeArray<float> ReadOnlyTrianglesNative => VerticesValuesNative;
+        public NativeArray<float> ReadOnlyVerticesValuesNative => VerticesValuesNative;
         public NativeArray<Vector3> ReadOnlyBaseVertices => BaseVerticesNative;
         
         public void MarchCubes(
@@ -105,7 +105,7 @@ namespace WFCTD.GridManagement
                     continue;
                 }
 
-                if (IsBorder(pos, vertexAmount))
+                if (MarchingCubeUtils.IsBorder(pos, vertexAmount))
                 {
                     VerticesValuesNative[i] = 0;
                 }
@@ -134,21 +134,19 @@ namespace WFCTD.GridManagement
             
             Profiler.BeginSample("MarchingCubesVisualizer.FillMesh");
             Mesh sharedMesh = gridMeshFilter.sharedMesh;
-            if (sharedMesh != null)
-            {
-                sharedMesh.vertices = SubVertices;
-                sharedMesh.triangles = ValidTriangles;
-            }
-            else
+            if (sharedMesh == null)
             {
                 sharedMesh = new Mesh()
                 {
-                    indexFormat = SubVertices.Length > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16,
-                    vertices = SubVertices,
-                    triangles = ValidTriangles
+                    indexFormat = SubVertices.Length > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16
                 };
             }
-            
+
+            sharedMesh.MarkDynamic();
+            sharedMesh.Clear();
+            sharedMesh.vertices = SubVertices;
+            sharedMesh.triangles = ValidTriangles;
+
             Profiler.EndSample();
             
             sharedMesh.RecalculateBounds();
@@ -205,21 +203,11 @@ namespace WFCTD.GridManagement
                     useLerp);
             }
         }
-
-        private static bool IsBorder(Vector3Int pos, Vector3Int vertexAmount)
-        {
-            return pos.x == 0 || pos.x == vertexAmount.x - 1 || pos.y == 0 || pos.y == vertexAmount.y - 1 || pos.z == 0 || pos.z == vertexAmount.z - 1;
-        }
         
         public void ReleaseBuffers()
         {
             VerticesValuesNative.Dispose();
             BaseVerticesNative.Dispose();
-        }
-        
-        ~MarchingCubesCpuVisualizer()
-        {
-            ReleaseBuffers();
         }
     }
 }

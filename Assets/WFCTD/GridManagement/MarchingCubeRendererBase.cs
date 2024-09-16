@@ -1,4 +1,5 @@
 ﻿
+using System;
 using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
@@ -52,7 +53,7 @@ namespace WFCTD.GridManagement
         {
             for (int i = 0; i < MarchingCubesVisualizer.SubVertices.Length; i++)
             {
-                Vector3 pos = _marchingCubesCpuVisualizer.SubVertices[i];
+                Vector3 pos = MarchingCubesVisualizer.SubVertices[i];
                 if (pos == Vector3.zero)
                 {
                     continue;
@@ -65,11 +66,11 @@ namespace WFCTD.GridManagement
 
         private void VisualizeBaseVertices()
         {
-            for (int i = 0; i < _marchingCubesCpuVisualizer.BaseVerticesNative.Length; i++)
+            for (int i = 0; i < MarchingCubesVisualizer.ReadOnlyBaseVertices.Length; i++)
             {
-                Vector3 pos = _marchingCubesCpuVisualizer.BaseVerticesNative[i];
-                Gizmos.color = Color.Lerp(Color.black, Color.white, _marchingCubesCpuVisualizer.VerticesValuesNative[i]);
-                if (_marchingCubesCpuVisualizer.VerticesValuesNative[i] < Threshold)
+                Vector3 pos = MarchingCubesVisualizer.ReadOnlyBaseVertices[i];
+                Gizmos.color = Color.Lerp(Color.black, Color.white, MarchingCubesVisualizer.ReadOnlyVerticesValuesNative[i]);
+                if (MarchingCubesVisualizer.ReadOnlyVerticesValuesNative[i] < Threshold)
                 {
                     Gizmos.color *= Color.red;
                 }
@@ -110,5 +111,11 @@ namespace WFCTD.GridManagement
         }
 
         public abstract void GetVertexValues(NativeArray<float> verticesValues);
+
+        protected void OnDestroy()
+        {
+            _marchingCubesGpuVisualizer?.ReleaseBuffers();
+            _marchingCubesCpuVisualizer?.ReleaseBuffers();
+        }
     }
 }
