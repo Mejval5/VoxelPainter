@@ -23,8 +23,10 @@ namespace WFCTD.GridManagement
         [SerializeField] private float _depthMultiplier = 1f;
         
         
-        private void OnEnable()
+        protected override void OnEnable()
         {
+            base.OnEnable();
+            
             if (_videoPlayer == null)
             {
                 _videoPlayer = GetComponent<VideoPlayer>();

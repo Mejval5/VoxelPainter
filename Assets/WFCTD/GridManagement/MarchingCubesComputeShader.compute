@@ -16,22 +16,48 @@ int4 CubeAmount; // w represents the cube floor
 int2 Offsets; // x middle offset, y top offset
 bool UseLerp;
 float Threshold;
+int AmountOfCubes;
+bool EnforceEmptyBorder;
+
+int3 ConvertIndexToPosition(uint i, uint floorSize)
+{
+    uint3 pos = int3(0, 0, 0);
+    pos.x = i % VertexAmount.x;
+    pos.z  = (i % floorSize) / VertexAmount.x;
+    pos.y  = i / floorSize;
+            
+    return pos;
+}
+
+float GetBaseVerticesValue(uint index)
+{
+    if (EnforceEmptyBorder)
+    {
+        int3 pos = ConvertIndexToPosition(index, VertexAmount.x * VertexAmount.z);
+        if (pos.x == 0 || pos.x == VertexAmount.x - 1 || pos.y == 0 || pos.y == VertexAmount.y - 1 || pos.z == 0 || pos.z == VertexAmount.z - 1)
+        {
+            return 0;
+        }
+    }
+    
+    return BaseVerticesValues[index];
+}
 
 void GetMarchedCube(
     inout uint baseVerticesOffsets[8],
     inout int subVerticesOffsets[12],
-    uint xPos,
-    uint yPos,
-    uint zPos)
+    int xPos,
+    int yPos,
+    int zPos)
 {
     uint cubeIndex = 0u;
     for (uint index = 0u; index < CornersPerCube; index++)
     {
-        float value = BaseVerticesValues[baseVerticesOffsets[index]];
+        float value = GetBaseVerticesValue(baseVerticesOffsets[index]);
         
         if (value > Threshold)
         {
-            cubeIndex |= 1 << index;
+            cubeIndex |= (1 << index);
         }
     }
     
@@ -43,6 +69,7 @@ void GetMarchedCube(
     
     int cubeEdgeFlags = CubeEdgeFlags[cubeIndex];
     
+    [unroll]
     for (int edgeIndex = 0u; edgeIndex < EdgesPerCube; edgeIndex++)
     {
         uint startPointLocal = EdgeConnection[edgeIndex * EdgeConnectionTableRowSize + 0u];
@@ -51,12 +78,12 @@ void GetMarchedCube(
         uint startPoint = baseVerticesOffsets[startPointLocal];
         uint endPoint = baseVerticesOffsets[endPointLocal];
         
-        float startValue = BaseVerticesValues[startPoint];
-        float endValue = BaseVerticesValues[endPoint];
+        float startValue = GetBaseVerticesValue(startPoint);
+        float endValue = GetBaseVerticesValue(endPoint);
         
         bool hasCrossing = (cubeEdgeFlags & (1 << edgeIndex)) != 0;
 
-        float offset = Threshold;
+        float offset = 0.5f;
         if (UseLerp && hasCrossing)
         {
             offset = (Threshold - startValue) / (endValue - startValue);
@@ -64,13 +91,13 @@ void GetMarchedCube(
         
         int index = subVerticesOffsets[edgeIndex];
         
-        float newX = EdgeDirection[edgeIndex * EdgeDirectionTableRowSize] * offset + CubeCornersPositions[startPointLocal * CubeCornersPositionsRowSize + 0u] + xPos;
+        float newX = EdgeDirection[edgeIndex * EdgeDirectionTableRowSize + 0u] * offset + CubeCornersPositions[startPointLocal * CubeCornersPositionsRowSize + 0u] + xPos;
         float newY = EdgeDirection[edgeIndex * EdgeDirectionTableRowSize + 1u] * offset + CubeCornersPositions[startPointLocal * CubeCornersPositionsRowSize + 1u] + yPos;
         float newZ = EdgeDirection[edgeIndex * EdgeDirectionTableRowSize + 2u] * offset + CubeCornersPositions[startPointLocal * CubeCornersPositionsRowSize + 2u] + zPos;
         SubVertices[index] = float3(newX, newY, newZ);
     }
-    
-    for (uint i = 0u; i < TriangleConnectionTableWidth;)
+
+    for (uint i = 0u; i < TriangleConnectionTableWidth - 1;)
     {
         int vertexIndex = TriangleConnectionTable[cubeIndex * TriangleConnectionTableRowSize + i];
         if (vertexIndex == -1)
@@ -78,7 +105,10 @@ void GetMarchedCube(
             break;
         }
 
-        int3 tri;
+        int x;
+        int y;
+        int z;
+        [unroll]
         for (int j = 0; j < 3; j++)
         {
             int winding;
@@ -98,38 +128,39 @@ void GetMarchedCube(
             // Assign values to the correct component of the int3
             if (j == 0)
             {
-                tri.x = subVerticesOffsets[localVertexIndex];
+                x = subVerticesOffsets[localVertexIndex];
             }
             else if (j == 1)
             {
-                tri.y = subVerticesOffsets[localVertexIndex];
+                y = subVerticesOffsets[localVertexIndex];
             }
             else if (j == 2)
             {
-                tri.z = subVerticesOffsets[localVertexIndex];
+                z = subVerticesOffsets[localVertexIndex];
             }
         }
         
         i += 3;
-        AppendedTriangles.Append(tri);
+        AppendedTriangles.Append(int3(x, y, z));
     }
 }
 
 
 // Define the main compute function
-[numthreads(64, 1, 1)]
+[numthreads(32, 1, 1)]
 void CSMain(uint3 id : SV_DispatchThreadID)
 {
     uint index = id.x;
-
-    uint xIndex = index % CubeAmount.x;
-    uint zIndex = (index % CubeAmount.w) / CubeAmount.x;
-    uint yIndex = index / CubeAmount.w;
-
-    if (xIndex >= (uint) CubeAmount.x || zIndex >= (uint) CubeAmount.y || yIndex >= (uint) CubeAmount.z)
+    
+    if (index >= (uint) AmountOfCubes)
     {
         return;
     }
+
+    int xIndex = index % CubeAmount.x;
+    int zIndex = (index % CubeAmount.w) / CubeAmount.x;
+    int yIndex = index / CubeAmount.w;
+
     
     int indexOffset = xIndex + zIndex * (CubeAmount.x + VertexAmount.x) + yIndex * Offsets.y;
     int middleIndexOffset = Offsets.x - zIndex * CubeAmount.x;

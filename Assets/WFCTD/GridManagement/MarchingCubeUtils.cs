@@ -355,6 +355,16 @@ namespace WFCTD.GridManagement
             
             return pos;
         }
+        
+        public static int ConvertPositionToIndex(Vector3Int pos, Vector3Int vertexAmount)
+        {
+            return ConvertPositionToIndex(pos, vertexAmount.x * vertexAmount.z, vertexAmount);
+        }
+        
+        public static int ConvertPositionToIndex(Vector3Int pos, int floorSize, Vector3Int vertexAmount)
+        {
+            return pos.x + pos.z * vertexAmount.x + pos.y * floorSize;
+        }
 
         public static bool IsBorder(Vector3Int pos, Vector3Int vertexAmount)
         {
@@ -404,7 +414,7 @@ namespace WFCTD.GridManagement
                 
                 bool hasCrossing = (cubeEdgeFlags & (1 << i)) != 0;
 
-                float offset = surface;
+                float offset = 0.5f;
                 if (useLerp && hasCrossing)
                 {
                     offset = (surface - startValue) / (endValue - startValue);

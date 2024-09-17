@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Unity.Collections;
 using UnityEngine;
@@ -30,6 +31,8 @@ namespace WFCTD.GridManagement
         private static readonly int BaseVerticesValues = Shader.PropertyToID("BaseVerticesValues");
         private static readonly int CubeEdgeFlags = Shader.PropertyToID("CubeEdgeFlags");
         private static readonly int TriangleConnectionTable = Shader.PropertyToID("TriangleConnectionTable");
+        private static readonly int AmountOfCubes = Shader.PropertyToID("AmountOfCubes");
+        private static readonly int EnforceEmptyBorder = Shader.PropertyToID("EnforceEmptyBorder");
 
         public NativeArray<float> VerticesValuesNative;
         public NativeArray<Vector3> BaseVerticesNative;
@@ -43,7 +46,40 @@ namespace WFCTD.GridManagement
         private ComputeBuffer _baseVerticesValuesBuffer;
         private ComputeBuffer _cubeEdgeFlagsBuffer;
         private ComputeBuffer _triangleConnectionTableBuffer;
+
+        private Array _subVerticesCleaningArray;
         
+        public void GetVerticesValuesNative(ref NativeArray<float> verticesValues, Vector3Int vertexAmount)
+        {
+            SetupVerticesArrays(vertexAmount);
+            verticesValues = VerticesValuesNative;
+        }
+
+        private void SetupVerticesArrays(Vector3Int vertexAmount)
+        {
+            int preAllocatedBaseVertices = vertexAmount.x * vertexAmount.y * vertexAmount.z;
+            bool recalculateVertexValues = VerticesValuesNative.IsCreated == false || preAllocatedBaseVertices != VerticesValuesNative.Length;
+            if (!recalculateVertexValues)
+            {
+                return;
+            }
+
+            BaseVerticesNative = new NativeArray<Vector3>(preAllocatedBaseVertices, Allocator.Persistent);
+            VerticesValuesNative = new NativeArray<float>(preAllocatedBaseVertices, Allocator.Persistent);
+            Profiler.BeginSample("MarchingCubesVisualizer.SetUpVertices");
+            int floorSize = vertexAmount.x * vertexAmount.z;
+            for (int i = 0; i < preAllocatedBaseVertices; i++)
+            {
+                Vector3Int pos = Vector3Int.zero;
+                pos.x = i % vertexAmount.x;
+                pos.z  = (i % floorSize) / vertexAmount.x;
+                pos.y  = i / floorSize;
+
+                BaseVerticesNative[i] = pos;
+            }
+            Profiler.EndSample();
+        }
+            
         public void MarchCubes(
             GenerationProperties generationProperties, 
             Vector3Int vertexAmount, 
@@ -65,51 +101,25 @@ namespace WFCTD.GridManagement
             int cubeAmountY = vertexAmount.y - 1;
             int cubeAmountZ = vertexAmount.z - 1;
             int amountOfCubes = cubeAmountX * cubeAmountY * cubeAmountZ;
-            int cubeFloorSize = vertexAmount.x * vertexAmount.z;
+            int cubeFloorSize = cubeAmountX * cubeAmountZ;
             int preAllocatedBaseVertices = vertexAmount.x * vertexAmount.y * vertexAmount.z;
             int floorSize = vertexAmount.x * vertexAmount.z;
             int frontFaceSize = vertexAmount.x * vertexAmount.y;
             int sideFaceSize = vertexAmount.z * vertexAmount.y;
             
             int preAllocatedSubVertices = preAllocatedBaseVertices + cubeAmountY * floorSize + cubeAmountZ * frontFaceSize + cubeAmountX * sideFaceSize;
-            
-            bool recalculateVertexValues = VerticesValuesNative.IsCreated == false || preAllocatedBaseVertices != VerticesValuesNative.Length;
-            if (recalculateVertexValues)
-            {
-                BaseVerticesNative = new NativeArray<Vector3>(preAllocatedBaseVertices, Allocator.Persistent);
-                VerticesValuesNative = new NativeArray<float>(preAllocatedBaseVertices, Allocator.Persistent);
-            }
+
+            SetupVerticesArrays(vertexAmount);
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.GetVertexValues");
             getVertexValues(VerticesValuesNative);
             Profiler.EndSample();
-            Profiler.BeginSample("MarchingCubesVisualizer.SetUpVertices");
-            for (int i = 0; i < preAllocatedBaseVertices; i++)
-            {
-                Vector3Int pos = Vector3Int.zero;
-                pos.x = i % vertexAmount.x;
-                pos.z  = (i % floorSize) / vertexAmount.x;
-                pos.y  = i / floorSize;
-
-                BaseVerticesNative[i] = pos;
-
-                if (!enforceEmptyBorder)
-                {
-                    continue;
-                }
-
-                if (MarchingCubeUtils.IsBorder(pos, vertexAmount))
-                {
-                    VerticesValuesNative[i] = 0;
-                }
-            }
-            Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.SetUpStructuredBuffers");
             SetupTriangleBuffer(amountOfCubes);
             SetupSubVerticesBuffer(preAllocatedSubVertices);
-            SetupBaseVerticesValuesBuffer(preAllocatedBaseVertices, recalculateVertexValues);
+            SetupBaseVerticesValuesBuffer(preAllocatedBaseVertices);
             SetupStaticBuffers();
             Profiler.EndSample();
             
@@ -120,14 +130,16 @@ namespace WFCTD.GridManagement
             
             Profiler.BeginSample("MarchingCubesVisualizer.InjectDataIntoComputeShader");
             InjectDataIntoComputeShader(vertexAmount, threshold, useLerp, floorSize, cubeAmountX, cubeAmountY, 
-                cubeAmountZ, cubeFloorSize, middleOffset, topOffset, computeShader);
+                cubeAmountZ, cubeFloorSize, middleOffset, topOffset, computeShader, amountOfCubes, enforceEmptyBorder);
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.MarchCubes");
             DispatchComputeShader(amountOfCubes, computeShader);
             Profiler.EndSample();
-            
+
             Profiler.BeginSample("MarchingCubesVisualizer.GetResults");
+                
+            Profiler.BeginSample("MarchingCubesVisualizer.CalculateSize");
             // Create a buffer to hold the count (size of 4 bytes for an int)
             ComputeBuffer triangleCountBuffer = new(1, sizeof(int), ComputeBufferType.Raw);
 
@@ -145,8 +157,6 @@ namespace WFCTD.GridManagement
             if (triangleCount == 0)
             {
                 Debug.LogWarning("No triangles appended.");
-                Profiler.EndSample();
-                return;
             }
 
             if (maxTriangles < 0)
@@ -154,11 +164,17 @@ namespace WFCTD.GridManagement
                 maxTriangles = triangleCount;
             }
             triangleCount = Math.Min(triangleCount, maxTriangles);
-            int[] triangleIndices = new int[triangleCount];
-            _appendedTrianglesBuffer.GetData(triangleIndices, 0, 0, triangleCount);
+            Profiler.EndSample();
+            Profiler.BeginSample("MarchingCubesVisualizer.GetTriangles");
+            int[] triangleIndices = new int[triangleCount * 3]; // hacky way to get all the items in single array, technically the buffer contains triplets of ints
+            _appendedTrianglesBuffer.GetData(triangleIndices, 0, 0,  triangleCount * 3);
+            Profiler.EndSample();
             
+            Profiler.BeginSample("MarchingCubesVisualizer.GetVertices");
             SubVertices = new Vector3[preAllocatedSubVertices];
             _subVerticesBuffer.GetData(SubVertices, 0, 0, preAllocatedSubVertices);
+            Profiler.EndSample();
+            
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.FillMesh");
@@ -169,8 +185,10 @@ namespace WFCTD.GridManagement
                 {
                     indexFormat = SubVertices.Length > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16
                 };
+                gridMeshFilter.sharedMesh = sharedMesh;
             }
 
+            sharedMesh.indexFormat = SubVertices.Length > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16;
             sharedMesh.MarkDynamic();
             sharedMesh.Clear();
             sharedMesh.vertices = SubVertices;
@@ -180,7 +198,7 @@ namespace WFCTD.GridManagement
         }
 
         private void InjectDataIntoComputeShader(Vector3Int vertexAmount, float threshold, bool useLerp, int floorSize, int cubeAmountX, int cubeAmountY, int cubeAmountZ, int cubeFloorSize, int middleOffset,
-            int topOffset, ComputeShader computeShader)
+            int topOffset, ComputeShader computeShader, int amountOfCubes, bool enforceEmptyBorder)
         {
             // Set the buffer on the compute shader
             int kernelHandle = computeShader.FindKernel(ComputeShaderProgram);
@@ -196,6 +214,8 @@ namespace WFCTD.GridManagement
             computeShader.SetInts(Offsets, middleOffset, topOffset);
             computeShader.SetBool(UseLerp, useLerp);
             computeShader.SetFloat(Threshold, threshold);
+            computeShader.SetInt(AmountOfCubes, amountOfCubes);
+            computeShader.SetBool(EnforceEmptyBorder, enforceEmptyBorder);
         }
 
         private void DispatchComputeShader(int amountOfCubes, ComputeShader computeShader)
@@ -208,12 +228,16 @@ namespace WFCTD.GridManagement
             computeShader.Dispatch(kernelHandle, threadGroupsX, 1, 1);
         }
 
-        private void SetupBaseVerticesValuesBuffer(int preAllocatedBaseVertices, bool recalculateVertexValues)
+        private void SetupBaseVerticesValuesBuffer(int preAllocatedBaseVertices)
         {
             const int sizeOfFloat = sizeof(float);
 
-            _baseVerticesValuesBuffer?.Dispose();
-            _baseVerticesValuesBuffer = new ComputeBuffer(preAllocatedBaseVertices, sizeOfFloat);
+            if (_baseVerticesValuesBuffer == null || _baseVerticesValuesBuffer.count != preAllocatedBaseVertices)
+            {
+                _baseVerticesValuesBuffer?.Dispose();
+                _baseVerticesValuesBuffer = new ComputeBuffer(preAllocatedBaseVertices, sizeOfFloat);
+            }
+            
             _baseVerticesValuesBuffer.SetData(VerticesValuesNative);
         }
 
@@ -221,8 +245,16 @@ namespace WFCTD.GridManagement
         {
             const int sizeOfFloat = sizeof(float);
             
-            _subVerticesBuffer?.Dispose();
-            _subVerticesBuffer = new ComputeBuffer(preAllocatedSubVertices, sizeOfFloat * 3);
+            if (_subVerticesCleaningArray == null || _subVerticesCleaningArray.Length != preAllocatedSubVertices)
+            {
+                _subVerticesCleaningArray = new float[preAllocatedSubVertices * 3];
+            
+                _subVerticesBuffer?.Dispose();
+                _subVerticesBuffer = new ComputeBuffer(preAllocatedSubVertices, sizeOfFloat * 3);
+            }
+            
+            // Clear the buffer
+            _subVerticesBuffer.SetData(_subVerticesCleaningArray);
         }
 
         private void SetupTriangleBuffer(int amountOfCubes)
@@ -231,26 +263,37 @@ namespace WFCTD.GridManagement
             const int strideInt = sizeof(int);
 
             // Initialize the AppendStructuredBuffer with an initial capacity
-            // Here, assuming a maximum of 300 indices (100 triangles)
-            int preAllocatedTriangles = amountOfCubes * MarchingCubeUtils.MaximumTrianglesPerCube * 3;
-            _appendedTrianglesBuffer?.Dispose();
-            _appendedTrianglesBuffer = new ComputeBuffer(preAllocatedTriangles, strideInt, ComputeBufferType.Append);
+            int preAllocatedTriangles = amountOfCubes * MarchingCubeUtils.MaximumTrianglesPerCube;
+            if (_appendedTrianglesBuffer == null || _appendedTrianglesBuffer.count != preAllocatedTriangles)
+            {
+                _appendedTrianglesBuffer?.Dispose();
+                _appendedTrianglesBuffer = new ComputeBuffer(preAllocatedTriangles, strideInt * 3, ComputeBufferType.Append);
+            }
+            
             _appendedTrianglesBuffer.SetCounterValue(0);
         }
 
         private void SetupStaticBuffers()
         {
-            _cubeEdgeFlagsBuffer?.Dispose();
-            _cubeEdgeFlagsBuffer = new ComputeBuffer(MarchingCubeUtils.CubeEdgeFlags.Length, sizeof(int));
-            _cubeEdgeFlagsBuffer.SetData(MarchingCubeUtils.CubeEdgeFlags);
-            
+            if (_cubeEdgeFlagsBuffer == null)
+            {
+                _cubeEdgeFlagsBuffer?.Dispose();
+                _cubeEdgeFlagsBuffer = new ComputeBuffer(MarchingCubeUtils.CubeEdgeFlags.Length, sizeof(int));
+                _cubeEdgeFlagsBuffer.SetData(MarchingCubeUtils.CubeEdgeFlags);
+            }
+
+            if (_triangleConnectionTableBuffer != null)
+            {
+                return;
+            }
+
             _triangleConnectionTableBuffer?.Dispose();
             _triangleConnectionTableBuffer = new ComputeBuffer(MarchingCubeUtils.TriangleConnectionTable.Length, sizeof(int));
-                
+
             // Get the dimensions
             int rows = MarchingCubeUtils.TriangleConnectionTable.GetLength(0); // 3 rows
             int cols = MarchingCubeUtils.TriangleConnectionTable.GetLength(1); // 3 columns
-                
+
             // Create a 1D array
             int[] triangleConnectionTable1D = new int[rows * cols]; // 9 elements
 
@@ -262,6 +305,7 @@ namespace WFCTD.GridManagement
                     triangleConnectionTable1D[i * cols + j] = MarchingCubeUtils.TriangleConnectionTable[i, j];
                 }
             }
+
             _triangleConnectionTableBuffer.SetData(triangleConnectionTable1D);
         }
         

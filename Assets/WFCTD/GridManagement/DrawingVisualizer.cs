@@ -29,8 +29,6 @@ namespace WFCTD.GridManagement
         [SerializeField] private float _changeSizeSpeed = 0.1f;
         [SerializeField] private float _cursorSizePixels = 50f;
         [SerializeField] private float _rayMarchStepSize = 0.5f;
-        
-        private float[,,] _drawing;
 
         private bool _isUserDrawing;
         private bool _isUserInteractingWithBg;
@@ -44,6 +42,9 @@ namespace WFCTD.GridManagement
         private bool _generating;
 
         [HideInInspector] [SerializeField] private float[] _serializedDrawing;
+        
+        private NativeArray<float> _verticesValuesNative;
+        private Vector3Int _cachedVertexAmount;
 
         protected override void GenerateMesh()
         {
@@ -52,12 +53,13 @@ namespace WFCTD.GridManagement
                 _generating = true;
 
                 bool didChange = false;
-                if (_drawing == null
-                    || _drawing.GetLength(0) != VertexAmountX
-                    || _drawing.GetLength(1) != VertexAmountY
-                    || _drawing.GetLength(2) != VertexAmountZ)
+                if (_verticesValuesNative.IsCreated == false
+                    || _cachedVertexAmount.x != VertexAmountX
+                    || _cachedVertexAmount.y != VertexAmountY
+                    || _cachedVertexAmount.z != VertexAmountZ)
                 {
-                    _drawing = new float[VertexAmountX, VertexAmountY, VertexAmountZ];
+                    MarchingCubesVisualizer.GetVerticesValuesNative(ref _verticesValuesNative, new Vector3Int(VertexAmountX, VertexAmountY, VertexAmountZ));
+                    _cachedVertexAmount = new Vector3Int(VertexAmountX, VertexAmountY, VertexAmountZ);
                     didChange = true;
                 }
 
@@ -73,18 +75,7 @@ namespace WFCTD.GridManagement
                     _serializedDrawing = new float[VertexAmountX * VertexAmountY * VertexAmountZ];
                 }
 
-                int index = 0;
-                for (int x = 0; x < VertexAmountX; x++)
-                {
-                    for (int y = 0; y < VertexAmountY; y++)
-                    {
-                        for (int z = 0; z < VertexAmountZ; z++)
-                        {
-                            _serializedDrawing[index] = _drawing[x, y, z];
-                            index++;
-                        }
-                    }
-                }
+                _verticesValuesNative.CopyTo(_serializedDrawing);
             }
             catch
             {
@@ -95,35 +86,42 @@ namespace WFCTD.GridManagement
                 _generating = false;
             }
         }
+        
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            
+#if UNITY_EDITOR
+            EditorOnEnable();
+#endif
+
+            if (_serializedDrawing == null || _allowRegeneration || _serializedDrawing.Length != VertexAmountX * VertexAmountY * VertexAmountZ)
+            {
+                GenerateMesh();
+                return;
+            }
+
+            MarchingCubesVisualizer.GetVerticesValuesNative(ref _verticesValuesNative, new Vector3Int(VertexAmountX, VertexAmountY, VertexAmountZ));
+            _cachedVertexAmount = new Vector3Int(VertexAmountX, VertexAmountY, VertexAmountZ);
+            _verticesValuesNative.CopyFrom(_serializedDrawing);
+
+            GenerateMesh();
+        }
 
 #if UNITY_EDITOR
-        private void OnEnable()
+        private void EditorOnEnable()
         {
             EditorApplication.update -= SceneView.RepaintAll;
             EditorApplication.update += SceneView.RepaintAll;
             SceneView.duringSceneGui -= DuringSceneGUI;
             SceneView.duringSceneGui += DuringSceneGUI;
-
-            if (_serializedDrawing == null || _serializedDrawing.Length != VertexAmountX * VertexAmountY * VertexAmountZ || _allowRegeneration)
-            {
-                return;
-            }
-
-            _drawing = new float[VertexAmountX, VertexAmountY, VertexAmountZ];
-            int index = 0;
-            for (int x = 0; x < VertexAmountX; x++)
-            {
-                for (int y = 0; y < VertexAmountY; y++)
-                {
-                    for (int z = 0; z < VertexAmountZ; z++)
-                    {
-                        _drawing[x, y, z] = _serializedDrawing[index];
-                        index++;
-                    }
-                }
-            }
-
-            GenerateMesh();
+        }
+        
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+            SceneView.duringSceneGui -= DuringSceneGUI;
+            EditorApplication.update -= SceneView.RepaintAll;
         }
 
         private void DuringSceneGUI(SceneView sceneView)
@@ -132,6 +130,7 @@ namespace WFCTD.GridManagement
             {
                 return;
             }
+            Profiler.BeginSample("DrawingVisualizer.DuringSceneGUI");
 
             Event currentEvent = Event.current;
             
@@ -143,7 +142,7 @@ namespace WFCTD.GridManagement
                 && currentEvent.mousePosition.y <= sceneView.position.height)
             {
                 Profiler.BeginSample("Raycast");
-                hitInfo = VoxelRaycaster.RayMarch(ray, _rayMarchStepSize, Threshold, VertexAmountX, VertexAmountY, VertexAmountZ, _marchingCubesCpuVisualizer.VerticesValuesNative, transform.position);
+                hitInfo = VoxelRaycaster.RayMarch(ray, _rayMarchStepSize, Threshold, VertexAmountX, VertexAmountY, VertexAmountZ, MarchingCubesVisualizer.ReadOnlyVerticesValuesNative, transform.position);
                 Profiler.EndSample();
             }
             
@@ -154,6 +153,7 @@ namespace WFCTD.GridManagement
 
             if (isLeftMouse && isRightMouse)
             {
+                Profiler.EndSample();
                 return;
             }
 
@@ -225,6 +225,7 @@ namespace WFCTD.GridManagement
 
             if (currentEvent.type is not EventType.Layout)
             {
+                Profiler.EndSample();
                 return;
             }
 
@@ -253,11 +254,13 @@ namespace WFCTD.GridManagement
                     }
                 }
             }
+            Profiler.EndSample();
         }
 #endif
 
         private void AddValue(Vector3 position, float radius, float value)
         {
+            Profiler.BeginSample("DrawingVisualizer.AddValue");
             // Only do update near the center to optimize
             int minX = Mathf.Max(0, (int)(position.x - radius));
             int minY = Mathf.Max(0, (int)(position.y - radius));
@@ -272,17 +275,19 @@ namespace WFCTD.GridManagement
                 {
                     for (int z = minZ; z < maxZ; z++)
                     {
-                        Vector3 pos = new(x, y, z);
+                        Vector3Int pos = new(x, y, z);
+                        int index = MarchingCubeUtils.ConvertPositionToIndex(pos, VertexAmount);
                         float distance = Vector3.Distance(pos, position);
                         float effectiveRadius = radius * (1 + _fuzziness);
                         float additionAmount = Mathf.Clamp(value * (1 - Mathf.Pow(distance / effectiveRadius, 4)), -1, 1);
                         if (distance <= effectiveRadius)
                         {
-                            _drawing[x, y, z] = Mathf.Clamp(_drawing[x, y, z] + additionAmount, 0, 1);
+                            _verticesValuesNative[index] = Mathf.Clamp(_verticesValuesNative[index] + additionAmount, 0, 1);
                         }
                     }
                 }
             }
+            Profiler.EndSample();
         }
 
         private void InitDrawing()
@@ -293,8 +298,10 @@ namespace WFCTD.GridManagement
                 {
                     for (int z = 0; z < VertexAmountZ; z++)
                     {
+                        Vector3Int pos = new(x, y, z);
+                        int index = MarchingCubeUtils.ConvertPositionToIndex(pos, VertexAmount);
                         float sineOffset = InitScale * Mathf.PerlinNoise(z * GenerationProperties.Frequency / 51.164658416f, x * GenerationProperties.Frequency / 87.1777416f);
-                        _drawing[x, y, z] = y < VertexAmountY / 2f + sineOffset ? 1 : 0;
+                        _verticesValuesNative[index] = y < VertexAmountY / 2f + sineOffset ? 1 : 0;
                     }
                 }
             }
@@ -302,13 +309,7 @@ namespace WFCTD.GridManagement
 
         public override void GetVertexValues(NativeArray<float> verticesValues)
         {
-            int floorSize = VertexAmountX * VertexAmountZ;
-            for (int i = 0; i < verticesValues.Length; i++)
-            {
-                Vector3Int pos = MarchingCubeUtils.ConvertIndexToPosition(i, floorSize, VertexAmount);
-                verticesValues[i] = _drawing[pos.x, pos.y, pos.z];
-            }
-            
+            // Do nothing
         }
     }
 }

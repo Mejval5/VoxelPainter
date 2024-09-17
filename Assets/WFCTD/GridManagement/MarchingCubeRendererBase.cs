@@ -36,6 +36,7 @@ namespace WFCTD.GridManagement
         
         public Vector3Int VertexAmount => new (VertexAmountX, VertexAmountY, VertexAmountZ);
 
+#if UNITY_EDITOR
         private void OnDrawGizmos()
         {
             if (_visualizeBaseVertices)
@@ -78,10 +79,30 @@ namespace WFCTD.GridManagement
             }
         }
 
-        private void OnValidate()
+        protected void OnValidate()
         {
+            if (gameObject.activeInHierarchy == false)
+            {
+                return;
+            }
+
             EditorApplication.delayCall -= GenerateMesh;
             EditorApplication.delayCall += GenerateMesh;
+        }
+#endif
+
+        protected virtual void OnEnable()
+        {
+            if (UseGpu)
+            {
+                _marchingCubesGpuVisualizer ??= new MarchingCubesGpuVisualizer();
+                MarchingCubesVisualizer = _marchingCubesGpuVisualizer;
+            }
+            else
+            {
+                _marchingCubesCpuVisualizer ??= new MarchingCubesCpuVisualizer();
+                MarchingCubesVisualizer = _marchingCubesCpuVisualizer;
+            }
         }
 
         protected virtual void GenerateMesh()
@@ -107,12 +128,11 @@ namespace WFCTD.GridManagement
                 _marchingCubesCpuVisualizer.MarchCubes(GenerationProperties, vertexAmount, Threshold, GridMeshFilter, 
                     GetVertexValues, _maxTriangles, _useLerp, EnforceEmptyBorder);
             }
-            
         }
 
         public abstract void GetVertexValues(NativeArray<float> verticesValues);
 
-        protected void OnDestroy()
+        protected virtual void OnDestroy()
         {
             _marchingCubesGpuVisualizer?.ReleaseBuffers();
             _marchingCubesCpuVisualizer?.ReleaseBuffers();

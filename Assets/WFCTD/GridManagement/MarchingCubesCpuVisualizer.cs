@@ -21,6 +21,34 @@ namespace WFCTD.GridManagement
         public NativeArray<float> ReadOnlyVerticesValuesNative => VerticesValuesNative;
         public NativeArray<Vector3> ReadOnlyBaseVertices => BaseVerticesNative;
         
+        public void GetVerticesValuesNative(ref NativeArray<float> verticesValues, Vector3Int vertexAmount)
+        {
+            SetupVerticesArrays(vertexAmount);
+            verticesValues = VerticesValuesNative;
+        }
+        
+        private void SetupVerticesArrays(Vector3Int vertexAmount)
+        {
+            int preAllocatedBaseVertices = vertexAmount.x * vertexAmount.y * vertexAmount.z;
+            bool recalculateVertexValues = VerticesValuesNative.IsCreated == false || preAllocatedBaseVertices != VerticesValuesNative.Length;
+            if (recalculateVertexValues)
+            {
+                BaseVerticesNative = new NativeArray<Vector3>(preAllocatedBaseVertices, Allocator.Persistent);
+                VerticesValuesNative = new NativeArray<float>(preAllocatedBaseVertices, Allocator.Persistent);
+                
+                int floorSize = vertexAmount.x * vertexAmount.z;
+                for (int i = 0; i < preAllocatedBaseVertices; i++)
+                {
+                    Vector3Int pos = Vector3Int.zero;
+                    pos.x = i % vertexAmount.x;
+                    pos.z = (i % floorSize) / vertexAmount.x;
+                    pos.y = i / floorSize;
+
+                    BaseVerticesNative[i] = pos;
+                }
+            }
+        }
+        
         public void MarchCubes(
             GenerationProperties generationProperties, 
             Vector3Int vertexAmount, 
@@ -57,13 +85,8 @@ namespace WFCTD.GridManagement
             {
                 Array.Fill(SubVertices, Vector3.zero);
             }
-            
-            bool recalculateVertexValues = VerticesValuesNative.IsCreated == false || preAllocatedVerticesValues != VerticesValuesNative.Length;
-            if (recalculateVertexValues)
-            {
-                BaseVerticesNative = new NativeArray<Vector3>(preAllocatedVerticesValues, Allocator.Persistent);
-                VerticesValuesNative = new NativeArray<float>(preAllocatedVerticesValues, Allocator.Persistent);
-            }
+
+            SetupVerticesArrays(vertexAmount);
             
             // Triangle has 3 vertices
             int preAllocatedTriangles = amountOfCubes * MarchingCubeUtils.MaximumTrianglesPerCube * 3;
@@ -93,17 +116,16 @@ namespace WFCTD.GridManagement
             
             for (int i = 0; i < preAllocatedVerticesValues; i++)
             {
-                Vector3Int pos = Vector3Int.zero;
-                pos.x = i % vertexAmount.x;
-                pos.z  = (i % floorSize) / vertexAmount.x;
-                pos.y  = i / floorSize;
-
-                BaseVerticesNative[i] = pos;
-
                 if (!enforceEmptyBorder)
                 {
                     continue;
                 }
+                
+                Vector3Int pos = Vector3Int.zero;
+                pos.x = i % vertexAmount.x;
+                pos.z = (i % floorSize) / vertexAmount.x;
+                pos.y = i / floorSize;
+
 
                 if (MarchingCubeUtils.IsBorder(pos, vertexAmount))
                 {
@@ -131,6 +153,11 @@ namespace WFCTD.GridManagement
             }
             
             Profiler.EndSample();
+
+            if (gridMeshFilter == null)
+            {
+                return; // Probably the object was destroyed while waiting for the mesh to be generated
+            }
             
             Profiler.BeginSample("MarchingCubesVisualizer.FillMesh");
             Mesh sharedMesh = gridMeshFilter.sharedMesh;
