@@ -3,7 +3,7 @@ using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Profiling;
 
-namespace WFCTD.GridManagement
+namespace VoxelPainter.GridManagement
 {
     public static class MarchingCubeUtils
     {

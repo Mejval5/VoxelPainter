@@ -1,14 +1,12 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using Unity.Collections;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
+using VoxelPainter.GridManagement;
 
-namespace WFCTD.GridManagement
+namespace VoxelPainter.VoxelVisualization
 {
     public class MarchingCubesCpuVisualizer : IMarchingCubesVisualizer
     {

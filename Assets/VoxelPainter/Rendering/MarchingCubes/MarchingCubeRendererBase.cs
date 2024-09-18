@@ -1,10 +1,9 @@
-﻿
-using System;
-using Unity.Collections;
+﻿using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
+using VoxelPainter.GridManagement;
 
-namespace WFCTD.GridManagement
+namespace VoxelPainter.VoxelVisualization
 {
     public abstract class MarchingCubeRendererBase : MonoBehaviour
     {

@@ -1,11 +1,10 @@
-﻿using System;
-using Unity.Collections;
+﻿using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Profiling;
-using UnityEngine.Serialization;
 using UnityEngine.Video;
+using VoxelPainter.GridManagement;
 
-namespace WFCTD.GridManagement
+namespace VoxelPainter.VoxelVisualization
 {
     [ExecuteAlways]
     public class VideoVisualizer : MarchingCubeRendererBase

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace WFCTD.GridManagement
+namespace VoxelPainter.GridManagement
 {
     [Serializable]
     public struct GridPoint

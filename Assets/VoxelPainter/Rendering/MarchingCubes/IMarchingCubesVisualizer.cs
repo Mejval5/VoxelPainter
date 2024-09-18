@@ -1,7 +1,7 @@
 ﻿using Unity.Collections;
 using UnityEngine;
 
-namespace WFCTD.GridManagement
+namespace VoxelPainter.VoxelVisualization
 {
     public interface IMarchingCubesVisualizer
     {

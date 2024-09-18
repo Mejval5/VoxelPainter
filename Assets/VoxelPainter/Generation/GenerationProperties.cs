@@ -1,7 +1,7 @@
 ﻿using System;
 using UnityEngine;
 
-namespace WFCTD.GridManagement
+namespace VoxelPainter.GridManagement
 {
     [Serializable]
     public class GenerationProperties

@@ -1,7 +1,7 @@
 
 using UnityEngine;
 
-namespace WFCTD
+namespace FoxFramework
 {
     public class EntryPoint : MonoBehaviour
     {

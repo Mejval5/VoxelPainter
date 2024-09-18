@@ -1,9 +1,10 @@
 ﻿using Unity.Collections;
 using UnityEngine;
+using VoxelPainter.GridManagement;
 
-namespace WFCTD.GridManagement
+namespace VoxelPainter.VoxelVisualization
 {
-    public class PlanetVisualizer : MarchingCubeRendererBase
+    public class SphereVisualizer : MarchingCubeRendererBase
     {
         [Range(0f, 200f)]
         [SerializeField] private float _planetSurface;

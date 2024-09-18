@@ -1,6 +1,7 @@
 ﻿using Unity.Collections;
 using UnityEngine;
-using WFCTD.GridManagement;
+using VoxelPainter.GridManagement;
+using VoxelPainter.VoxelVisualization;
 
 public static class VoxelRaycaster
 {

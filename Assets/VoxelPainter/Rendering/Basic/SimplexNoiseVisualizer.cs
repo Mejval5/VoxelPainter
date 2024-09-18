@@ -1,9 +1,11 @@
 ﻿using Unity.Collections;
 using UnityEngine;
+using VoxelPainter.GridManagement;
 
-namespace WFCTD.GridManagement
+namespace VoxelPainter.VoxelVisualization
 {
-    public class TrigVisualizer : MarchingCubeRendererBase
+    [ExecuteAlways]
+    public class SimplexNoiseVisualizer : MarchingCubeRendererBase
     {
         public override void GetVertexValues(NativeArray<float> verticesValues)
         {
@@ -12,13 +14,19 @@ namespace WFCTD.GridManagement
 
             for (int i = 0; i < verticesValues.Length; i++)
             {
-                Vector3Int position = MarchingCubeUtils.ConvertIndexToPosition(i, floorSize, vertexAmount);
+                Vector3Int position =MarchingCubeUtils.ConvertIndexToPosition(i, floorSize, vertexAmount);
+                
                 float x = (position.x + GenerationProperties.Origin.x) * GenerationProperties.Frequency / 1000f;
                 float y = (position.y + GenerationProperties.Origin.y) * GenerationProperties.Frequency / 1000f;
                 float z = (position.z + GenerationProperties.Origin.z) * GenerationProperties.Frequency / 1000f;
-            
-                verticesValues[i] = (Mathf.Sin(x) + Mathf.Cos(y) + Mathf.Cos(z) + 3) / 6f;
+
+                verticesValues[i] = CustomNoiseSimplex(x, y, z);
             }
+        }
+
+        private static float CustomNoiseSimplex(float x, float y, float z)
+        {
+            return Mathf.Clamp01(Mathf.Pow(SimplexNoise.Generate(x, y, z), 2));
         }
     }
 }

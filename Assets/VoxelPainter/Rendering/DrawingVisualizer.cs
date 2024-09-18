@@ -3,8 +3,9 @@ using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Profiling;
+using VoxelPainter.GridManagement;
 
-namespace WFCTD.GridManagement
+namespace VoxelPainter.VoxelVisualization
 {
     public struct HitMeshInfo
     {

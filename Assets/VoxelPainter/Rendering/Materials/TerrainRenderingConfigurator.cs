@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace WFCTD.GridManagement
+namespace VoxelPainter.GridManagement
 {
     [ExecuteAlways]
     public class TerrainRenderingConfigurator : MonoBehaviour

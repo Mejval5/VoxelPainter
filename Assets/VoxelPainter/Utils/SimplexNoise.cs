@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-namespace WFCTD.GridManagement
+namespace VoxelPainter.GridManagement
 {
     public static class SimplexNoise
     {

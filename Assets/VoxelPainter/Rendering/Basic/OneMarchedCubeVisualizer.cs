@@ -1,13 +1,10 @@
-﻿
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using JetBrains.Annotations;
+﻿using System.Linq;
 using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
+using VoxelPainter.GridManagement;
 
-namespace WFCTD.GridManagement
+namespace VoxelPainter.VoxelVisualization
 {
     [ExecuteAlways]
     public class OneMarchedCubeVisualizer : MonoBehaviour
