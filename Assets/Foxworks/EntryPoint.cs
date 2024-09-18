@@ -1,7 +1,7 @@
 
 using UnityEngine;
 
-namespace FoxFramework
+namespace Foxworks
 {
     public class EntryPoint : MonoBehaviour
     {

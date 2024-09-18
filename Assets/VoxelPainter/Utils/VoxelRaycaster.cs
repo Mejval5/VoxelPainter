@@ -7,8 +7,8 @@ public static class VoxelRaycaster
 {
     public static HitMeshInfo RayMarch(Ray ray, float stepSize, float threshold, int vertexAmountX, int vertexAmountY, int vertexAmountZ, NativeArray<float> verticesValues, Vector3 gridOrigin)
     {
-        HitMeshInfo hitInfo = new HitMeshInfo();
-        Vector3 gridSpacing = new Vector3(1f, 1f, 1f);
+        HitMeshInfo hitInfo = new ();
+        Vector3 gridSpacing = new (1f, 1f, 1f);
         float maxDistance = Mathf.Sqrt(Mathf.Pow((vertexAmountX * gridSpacing.x), 2) + Mathf.Pow((vertexAmountY * gridSpacing.y), 2) + Mathf.Pow((vertexAmountZ * gridSpacing.z), 2));
         
         // Define the voxel grid bounds
