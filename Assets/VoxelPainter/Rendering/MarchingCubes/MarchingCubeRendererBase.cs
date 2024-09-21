@@ -1,13 +1,15 @@
 ﻿using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Profiling;
 using VoxelPainter.GridManagement;
+using VoxelPainter.Rendering.MarchingCubes;
 
 namespace VoxelPainter.VoxelVisualization
 {
+    [ExecuteAlways]
     public abstract class MarchingCubeRendererBase : MonoBehaviour
     {
-        [field: SerializeField] public GenerationProperties GenerationProperties { get; private set; }
         [SerializeField] private bool _useLerp = true;
         [SerializeField] private bool _visualizeBaseVertices;
         [SerializeField] private bool _visualizeSubVertices;
@@ -18,8 +20,8 @@ namespace VoxelPainter.VoxelVisualization
         protected MarchingCubesGpuVisualizer _marchingCubesGpuVisualizer;
         
         protected IMarchingCubesVisualizer MarchingCubesVisualizer { get; private set; }
-        
-        [field: SerializeField] public bool UseGpu { get; private set; }
+
+        [field: SerializeField] public bool UseGpu { get; private set; } = true;
         [field: SerializeField] public ComputeShader MarchingCubeComputeShader { get; private set; }
         
         [field: SerializeField] public MeshFilter GridMeshFilter { get; private set; }
@@ -66,11 +68,16 @@ namespace VoxelPainter.VoxelVisualization
 
         private void VisualizeBaseVertices()
         {
-            for (int i = 0; i < MarchingCubesVisualizer.ReadOnlyBaseVertices.Length; i++)
+            NativeArray<Vector3> vertices = new();
+            NativeArray<float> verticesValues = new();
+            MarchingCubesVisualizer.GetBaseVerticesNative(ref vertices, VertexAmount);
+            MarchingCubesVisualizer.GetVerticesValuesNative(ref verticesValues, VertexAmount);
+            
+            for (int i = 0; i < vertices.Length; i++)
             {
-                Vector3 pos = MarchingCubesVisualizer.ReadOnlyBaseVertices[i];
-                Gizmos.color = Color.Lerp(Color.black, Color.white, MarchingCubesVisualizer.ReadOnlyVerticesValuesNative[i]);
-                if (MarchingCubesVisualizer.ReadOnlyVerticesValuesNative[i] < Threshold)
+                Vector3 pos = vertices[i];
+                Gizmos.color = Color.Lerp(Color.black, Color.white, verticesValues[i]);
+                if (verticesValues[i] < Threshold)
                 {
                     Gizmos.color *= Color.red;
                 }
@@ -104,7 +111,7 @@ namespace VoxelPainter.VoxelVisualization
             }
         }
 
-        protected virtual void GenerateMesh()
+        public virtual void GenerateMesh()
         {
             if (GridMeshFilter == null)
             {
@@ -113,20 +120,22 @@ namespace VoxelPainter.VoxelVisualization
             
             Vector3Int vertexAmount = new (VertexAmountX, VertexAmountY, VertexAmountZ);
             
+            Profiler.BeginSample("MarchCubes");
             if (UseGpu)
             {
                 _marchingCubesGpuVisualizer ??= new MarchingCubesGpuVisualizer();
                 MarchingCubesVisualizer = _marchingCubesGpuVisualizer;
-                _marchingCubesGpuVisualizer.MarchCubes(GenerationProperties, vertexAmount, Threshold, GridMeshFilter, 
+                _marchingCubesGpuVisualizer.MarchCubes(vertexAmount, Threshold, GridMeshFilter, 
                     GetVertexValues, MarchingCubeComputeShader, _maxTriangles, _useLerp, EnforceEmptyBorder);
             }
             else
             {
                 _marchingCubesCpuVisualizer ??= new MarchingCubesCpuVisualizer();
                 MarchingCubesVisualizer = _marchingCubesCpuVisualizer;
-                _marchingCubesCpuVisualizer.MarchCubes(GenerationProperties, vertexAmount, Threshold, GridMeshFilter, 
+                _marchingCubesCpuVisualizer.MarchCubes(vertexAmount, Threshold, GridMeshFilter, 
                     GetVertexValues, _maxTriangles, _useLerp, EnforceEmptyBorder);
             }
+            Profiler.EndSample();
         }
 
         public abstract void GetVertexValues(NativeArray<float> verticesValues);

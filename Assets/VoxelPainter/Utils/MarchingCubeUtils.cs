@@ -1,9 +1,8 @@
 ﻿using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine;
-using UnityEngine.Profiling;
 
-namespace VoxelPainter.GridManagement
+namespace VoxelPainter.Utils
 {
     public static class MarchingCubeUtils
     {

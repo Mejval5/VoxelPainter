@@ -5,10 +5,9 @@ namespace VoxelPainter.VoxelVisualization
 {
     public interface IMarchingCubesVisualizer
     {
-        NativeArray<float> ReadOnlyVerticesValuesNative { get; }
-        NativeArray<Vector3> ReadOnlyBaseVertices { get; }
         Vector3[] SubVertices { get; }
 
+        void GetBaseVerticesNative(ref NativeArray<Vector3> vertices, Vector3Int vertexAmount);
         void GetVerticesValuesNative(ref NativeArray<float> verticesValues, Vector3Int vertexAmount);
     }
 }

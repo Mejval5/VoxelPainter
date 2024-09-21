@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 using VoxelPainter.GridManagement;
+using VoxelPainter.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
@@ -19,6 +20,12 @@ namespace VoxelPainter.VoxelVisualization
         public NativeArray<float> ReadOnlyVerticesValuesNative => VerticesValuesNative;
         public NativeArray<Vector3> ReadOnlyBaseVertices => BaseVerticesNative;
         
+        public void GetBaseVerticesNative(ref NativeArray<Vector3> vertices, Vector3Int vertexAmount)
+        {
+            SetupVerticesArrays(vertexAmount);
+            vertices = BaseVerticesNative;
+        }
+        
         public void GetVerticesValuesNative(ref NativeArray<float> verticesValues, Vector3Int vertexAmount)
         {
             SetupVerticesArrays(vertexAmount);
@@ -29,26 +36,27 @@ namespace VoxelPainter.VoxelVisualization
         {
             int preAllocatedBaseVertices = vertexAmount.x * vertexAmount.y * vertexAmount.z;
             bool recalculateVertexValues = VerticesValuesNative.IsCreated == false || preAllocatedBaseVertices != VerticesValuesNative.Length;
-            if (recalculateVertexValues)
+            if (!recalculateVertexValues)
             {
-                BaseVerticesNative = new NativeArray<Vector3>(preAllocatedBaseVertices, Allocator.Persistent);
-                VerticesValuesNative = new NativeArray<float>(preAllocatedBaseVertices, Allocator.Persistent);
-                
-                int floorSize = vertexAmount.x * vertexAmount.z;
-                for (int i = 0; i < preAllocatedBaseVertices; i++)
-                {
-                    Vector3Int pos = Vector3Int.zero;
-                    pos.x = i % vertexAmount.x;
-                    pos.z = (i % floorSize) / vertexAmount.x;
-                    pos.y = i / floorSize;
+                return;
+            }
 
-                    BaseVerticesNative[i] = pos;
-                }
+            BaseVerticesNative = new NativeArray<Vector3>(preAllocatedBaseVertices, Allocator.Persistent);
+            VerticesValuesNative = new NativeArray<float>(preAllocatedBaseVertices, Allocator.Persistent);
+                
+            int floorSize = vertexAmount.x * vertexAmount.z;
+            for (int i = 0; i < preAllocatedBaseVertices; i++)
+            {
+                Vector3Int pos = Vector3Int.zero;
+                pos.x = i % vertexAmount.x;
+                pos.z = (i % floorSize) / vertexAmount.x;
+                pos.y = i / floorSize;
+
+                BaseVerticesNative[i] = pos;
             }
         }
         
         public void MarchCubes(
-            GenerationProperties generationProperties, 
             Vector3Int vertexAmount, 
             float threshold, 
             MeshFilter gridMeshFilter,
@@ -57,11 +65,6 @@ namespace VoxelPainter.VoxelVisualization
             bool useLerp = true,
             bool enforceEmptyBorder = true)
         {
-            if (generationProperties == null)
-            {
-                return;
-            }
-            
             Profiler.BeginSample("MarchingCubesVisualizer.Setup");
 
             int cubeAmountX = vertexAmount.x - 1;

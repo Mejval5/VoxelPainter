@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Video;
 using VoxelPainter.GridManagement;
+using VoxelPainter.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {

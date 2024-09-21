@@ -1,6 +1,7 @@
 ﻿using Unity.Collections;
 using UnityEngine;
 using VoxelPainter.GridManagement;
+using VoxelPainter.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {

@@ -3,6 +3,7 @@ using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 using VoxelPainter.GridManagement;
+using VoxelPainter.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
@@ -61,8 +62,7 @@ namespace VoxelPainter.VoxelVisualization
             }
             
             Vector3Int vertexAmount = new (2, 2, 2);
-            GenerationProperties generationProperties = new ();
-            _marchingCubesCpuVisualizer.MarchCubes(generationProperties, vertexAmount, _surface, _meshFilter, GetVertexValues, enforceEmptyBorder: false);
+            _marchingCubesCpuVisualizer.MarchCubes(vertexAmount, _surface, _meshFilter, GetVertexValues, enforceEmptyBorder: false);
         }
         
         private void GetVertexValues(NativeArray<float> verticesValues)

@@ -1,11 +1,14 @@
 ﻿using Unity.Collections;
 using UnityEngine;
 using VoxelPainter.GridManagement;
+using VoxelPainter.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
     public class TrigVisualizer : MarchingCubeRendererBase
     {
+        [SerializeField] private GenerationProperties _generationProperties;
+        
         public override void GetVertexValues(NativeArray<float> verticesValues)
         {
             int floorSize = VertexAmountX * VertexAmountZ;
@@ -14,9 +17,9 @@ namespace VoxelPainter.VoxelVisualization
             for (int i = 0; i < verticesValues.Length; i++)
             {
                 Vector3Int position = MarchingCubeUtils.ConvertIndexToPosition(i, floorSize, vertexAmount);
-                float x = (position.x + GenerationProperties.Origin.x) * GenerationProperties.Frequency / 1000f;
-                float y = (position.y + GenerationProperties.Origin.y) * GenerationProperties.Frequency / 1000f;
-                float z = (position.z + GenerationProperties.Origin.z) * GenerationProperties.Frequency / 1000f;
+                float x = (position.x + _generationProperties.Origin.x) * _generationProperties.Frequency / 1000f;
+                float y = (position.y + _generationProperties.Origin.y) * _generationProperties.Frequency / 1000f;
+                float z = (position.z + _generationProperties.Origin.z) * _generationProperties.Frequency / 1000f;
             
                 verticesValues[i] = (Mathf.Sin(x) + Mathf.Cos(y) + Mathf.Cos(z) + 3) / 6f;
             }

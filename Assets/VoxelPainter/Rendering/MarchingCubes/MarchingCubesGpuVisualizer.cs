@@ -1,25 +1,17 @@
 ﻿using System;
-using System.Runtime.InteropServices;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
-using VoxelPainter.GridManagement;
+using VoxelPainter.Utils;
+using VoxelPainter.VoxelVisualization;
 
-namespace VoxelPainter.VoxelVisualization
+namespace VoxelPainter.Rendering.MarchingCubes
 {
     public class MarchingCubesGpuVisualizer : IMarchingCubesVisualizer
     {
         private const string ComputeShaderProgram = "CSMain";
-
-        // Ensure sequential layout for memory alignment
-        [StructLayout(LayoutKind.Sequential)]
-        public struct Triangle
-        {
-            public int v1;
-            public int v2;
-            public int v3;
-        }
+        private static bool CleanSubVerticesBuffer => false;
         
         private static readonly int AppendedTriangles = Shader.PropertyToID("AppendedTriangles");
         private static readonly int VertexAmount = Shader.PropertyToID("VertexAmount");
@@ -33,13 +25,13 @@ namespace VoxelPainter.VoxelVisualization
         private static readonly int TriangleConnectionTable = Shader.PropertyToID("TriangleConnectionTable");
         private static readonly int AmountOfCubes = Shader.PropertyToID("AmountOfCubes");
         private static readonly int EnforceEmptyBorder = Shader.PropertyToID("EnforceEmptyBorder");
-
-        public NativeArray<float> VerticesValuesNative;
-        public NativeArray<Vector3> BaseVerticesNative;
+        
         public Vector3[] SubVertices { get; private set; }
         
-        public NativeArray<float> ReadOnlyVerticesValuesNative => VerticesValuesNative;
-        public NativeArray<Vector3> ReadOnlyBaseVertices => BaseVerticesNative;
+        private int[] _triangleIndices;
+
+        private NativeArray<float> _verticesValuesNative;
+        private NativeArray<Vector3> _baseVerticesNative;
         
         private ComputeBuffer _appendedTrianglesBuffer;
         private ComputeBuffer _subVerticesBuffer;
@@ -48,24 +40,30 @@ namespace VoxelPainter.VoxelVisualization
         private ComputeBuffer _triangleConnectionTableBuffer;
 
         private Array _subVerticesCleaningArray;
+                
+        public void GetBaseVerticesNative(ref NativeArray<Vector3> vertices, Vector3Int vertexAmount)
+        {
+            SetupVerticesArrays(vertexAmount);
+            vertices = _baseVerticesNative;
+        }
         
         public void GetVerticesValuesNative(ref NativeArray<float> verticesValues, Vector3Int vertexAmount)
         {
             SetupVerticesArrays(vertexAmount);
-            verticesValues = VerticesValuesNative;
+            verticesValues = _verticesValuesNative;
         }
 
         private void SetupVerticesArrays(Vector3Int vertexAmount)
         {
             int preAllocatedBaseVertices = vertexAmount.x * vertexAmount.y * vertexAmount.z;
-            bool recalculateVertexValues = VerticesValuesNative.IsCreated == false || preAllocatedBaseVertices != VerticesValuesNative.Length;
+            bool recalculateVertexValues = _verticesValuesNative.IsCreated == false || preAllocatedBaseVertices != _verticesValuesNative.Length;
             if (!recalculateVertexValues)
             {
                 return;
             }
 
-            BaseVerticesNative = new NativeArray<Vector3>(preAllocatedBaseVertices, Allocator.Persistent);
-            VerticesValuesNative = new NativeArray<float>(preAllocatedBaseVertices, Allocator.Persistent);
+            _baseVerticesNative = new NativeArray<Vector3>(preAllocatedBaseVertices, Allocator.Persistent);
+            _verticesValuesNative = new NativeArray<float>(preAllocatedBaseVertices, Allocator.Persistent);
             Profiler.BeginSample("MarchingCubesVisualizer.SetUpVertices");
             int floorSize = vertexAmount.x * vertexAmount.z;
             for (int i = 0; i < preAllocatedBaseVertices; i++)
@@ -75,13 +73,12 @@ namespace VoxelPainter.VoxelVisualization
                 pos.z  = (i % floorSize) / vertexAmount.x;
                 pos.y  = i / floorSize;
 
-                BaseVerticesNative[i] = pos;
+                _baseVerticesNative[i] = pos;
             }
             Profiler.EndSample();
         }
             
         public void MarchCubes(
-            GenerationProperties generationProperties, 
             Vector3Int vertexAmount, 
             float threshold, 
             MeshFilter gridMeshFilter,
@@ -91,11 +88,6 @@ namespace VoxelPainter.VoxelVisualization
             bool useLerp = true,
             bool enforceEmptyBorder = true)
         {
-            if (generationProperties == null)
-            {
-                return;
-            }
-            
             Profiler.BeginSample("MarchingCubesVisualizer.Setup");
             int cubeAmountX = vertexAmount.x - 1;
             int cubeAmountY = vertexAmount.y - 1;
@@ -113,13 +105,22 @@ namespace VoxelPainter.VoxelVisualization
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.GetVertexValues");
-            getVertexValues(VerticesValuesNative);
+            getVertexValues(_verticesValuesNative);
             Profiler.EndSample();
             
-            Profiler.BeginSample("MarchingCubesVisualizer.SetUpStructuredBuffers");
+            Profiler.BeginSample("MarchingCubesVisualizer.SetupTriangleBuffer");
             SetupTriangleBuffer(amountOfCubes);
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("MarchingCubesVisualizer.SetupSubVerticesBuffer");
             SetupSubVerticesBuffer(preAllocatedSubVertices);
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("MarchingCubesVisualizer.SetupBaseVerticesValuesBuffer");
             SetupBaseVerticesValuesBuffer(preAllocatedBaseVertices);
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("MarchingCubesVisualizer.SetupStaticBuffers");
             SetupStaticBuffers();
             Profiler.EndSample();
             
@@ -136,8 +137,6 @@ namespace VoxelPainter.VoxelVisualization
             Profiler.BeginSample("MarchingCubesVisualizer.MarchCubes");
             DispatchComputeShader(amountOfCubes, computeShader);
             Profiler.EndSample();
-
-            Profiler.BeginSample("MarchingCubesVisualizer.GetResults");
                 
             Profiler.BeginSample("MarchingCubesVisualizer.CalculateSize");
             // Create a buffer to hold the count (size of 4 bytes for an int)
@@ -166,18 +165,26 @@ namespace VoxelPainter.VoxelVisualization
             triangleCount = Math.Min(triangleCount, maxTriangles);
             Profiler.EndSample();
             Profiler.BeginSample("MarchingCubesVisualizer.GetTriangles");
-            int[] triangleIndices = new int[triangleCount * 3]; // hacky way to get all the items in single array, technically the buffer contains triplets of ints
-            _appendedTrianglesBuffer.GetData(triangleIndices, 0, 0,  triangleCount * 3);
+            int triangleBufferSize = triangleCount * 3;
+            if (_triangleIndices == null || _triangleIndices.Length != triangleBufferSize)
+            {
+                _triangleIndices = new int[triangleBufferSize];
+            }
+            
+            // The buffer contains triplets of ints, but we can inject it into a flat int array
+            _appendedTrianglesBuffer.GetData(_triangleIndices, 0, 0,  triangleCount * 3);
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.GetVertices");
-            SubVertices = new Vector3[preAllocatedSubVertices];
+            if (SubVertices == null || SubVertices.Length != preAllocatedSubVertices)
+            {
+                SubVertices = new Vector3[preAllocatedSubVertices];
+            }
+
             _subVerticesBuffer.GetData(SubVertices, 0, 0, preAllocatedSubVertices);
             Profiler.EndSample();
-            
-            Profiler.EndSample();
-            
-            Profiler.BeginSample("MarchingCubesVisualizer.FillMesh");
+
+            Profiler.BeginSample("MarchingCubesVisualizer.FillMesh.SetupSharedMesh");
             Mesh sharedMesh = gridMeshFilter.sharedMesh;
             if (sharedMesh == null)
             {
@@ -187,13 +194,33 @@ namespace VoxelPainter.VoxelVisualization
                 };
                 gridMeshFilter.sharedMesh = sharedMesh;
             }
+            Profiler.EndSample();
 
+            Profiler.BeginSample("MarchingCubesVisualizer.SetupSharedMeshFormat");
             sharedMesh.indexFormat = SubVertices.Length > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16;
             sharedMesh.MarkDynamic();
             sharedMesh.Clear();
-            sharedMesh.vertices = SubVertices;
-            sharedMesh.triangles = triangleIndices;
-            sharedMesh.RecalculateBounds();
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("MarchingCubesVisualizer.FillMeshVertices");
+            VertexAttributeDescriptor[] vertexAttributeDescriptors = { new (VertexAttribute.Position) };
+            sharedMesh.SetVertexBufferParams(preAllocatedSubVertices, vertexAttributeDescriptors);
+            sharedMesh.SetVertexBufferData(SubVertices, 0, 0, preAllocatedSubVertices, 0, MeshUpdateFlags.DontValidateIndices );
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("MarchingCubesVisualizer.FillMeshTriangles");
+            sharedMesh.SetIndexBufferParams(triangleBufferSize, IndexFormat.UInt32);
+            sharedMesh.SetIndexBufferData(_triangleIndices, 0, 0, triangleBufferSize, MeshUpdateFlags.DontValidateIndices);
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("MarchingCubesVisualizer.FillMesh.RecalculateBounds");
+            Vector3 vertexSize = vertexAmount;
+            sharedMesh.bounds = new Bounds(vertexSize / 2f, vertexAmount);
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("MarchingCubesVisualizer.FillMesh.SetSubMesh");
+            sharedMesh.subMeshCount = 1;
+            sharedMesh.SetSubMesh(0, new SubMeshDescriptor(0, triangleBufferSize, MeshTopology.Triangles));
             Profiler.EndSample();
         }
 
@@ -238,23 +265,36 @@ namespace VoxelPainter.VoxelVisualization
                 _baseVerticesValuesBuffer = new ComputeBuffer(preAllocatedBaseVertices, sizeOfFloat);
             }
             
-            _baseVerticesValuesBuffer.SetData(VerticesValuesNative);
+            _baseVerticesValuesBuffer.SetData(_verticesValuesNative);
         }
 
         private void SetupSubVerticesBuffer(int preAllocatedSubVertices)
         {
             const int sizeOfFloat = sizeof(float);
             
-            if (_subVerticesCleaningArray == null || _subVerticesCleaningArray.Length != preAllocatedSubVertices)
+            Profiler.BeginSample("MarchingCubesVisualizer.SetupSubVerticesBuffer");
+            if (_subVerticesBuffer == null || _subVerticesBuffer.count != preAllocatedSubVertices)
             {
-                _subVerticesCleaningArray = new float[preAllocatedSubVertices * 3];
-            
                 _subVerticesBuffer?.Dispose();
                 _subVerticesBuffer = new ComputeBuffer(preAllocatedSubVertices, sizeOfFloat * 3);
             }
-            
+            Profiler.EndSample();
+                        
             // Clear the buffer
+            if (!CleanSubVerticesBuffer)
+            {
+                return;
+            }
+
+            Profiler.BeginSample("MarchingCubesVisualizer.ClearBuffer");
+            int cleaningArraySize = preAllocatedSubVertices * 3;
+            if (_subVerticesCleaningArray == null || _subVerticesCleaningArray.Length != cleaningArraySize)
+            {
+                _subVerticesCleaningArray = new float[cleaningArraySize];
+            }
+
             _subVerticesBuffer.SetData(_subVerticesCleaningArray);
+            Profiler.EndSample();
         }
 
         private void SetupTriangleBuffer(int amountOfCubes)
@@ -317,8 +357,8 @@ namespace VoxelPainter.VoxelVisualization
             _cubeEdgeFlagsBuffer?.Dispose();
             _triangleConnectionTableBuffer?.Dispose();
             
-            VerticesValuesNative.Dispose();
-            BaseVerticesNative.Dispose();
+            _verticesValuesNative.Dispose();
+            _baseVerticesNative.Dispose();
         }
     }
 }
