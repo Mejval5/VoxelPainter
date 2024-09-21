@@ -1,0 +1,3 @@
+[submodule "Assets/Foxworks"]
+	path = Assets/Foxworks
+	url = git@github.com:Mejval5/Foxworks.git

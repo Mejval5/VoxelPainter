@@ -13,10 +13,20 @@ namespace VoxelPainter.VoxelVisualization
         public int VertexIndex;
         public bool IsHit;
     }
+    
+    public enum CurrentPaintMode
+    {
+        None,
+        Draw,
+        Erase,
+        ChangeSize
+    }
 
     [ExecuteAlways]
     public class DrawingVisualizer : MarchingCubeRendererBase
     {
+        [SerializeField] private Camera _mainCamera;
+        
         [SerializeField] private bool _allowRegeneration = false;
         [field: Range(0.1f, 10f)]
         [field: SerializeField]
@@ -31,9 +41,8 @@ namespace VoxelPainter.VoxelVisualization
         [SerializeField] private float _cursorSizePixels = 50f;
         [SerializeField] private float _rayMarchStepSize = 0.5f;
 
-        private bool _isUserDrawing;
-        private bool _isUserInteractingWithBg;
-        private bool _isUserChangingSize;
+        [HideInInspector] [SerializeField] private float[] _serializedDrawing;
+
         private float _mouseRadiusChangeSizeStart;
         private float _changeSizeScreenSpaceDistance;
         private Vector2 _changeSizeStartPosition;
@@ -41,11 +50,13 @@ namespace VoxelPainter.VoxelVisualization
 
         private long _lastTimeDraw;
         private bool _generating;
-
-        [HideInInspector] [SerializeField] private float[] _serializedDrawing;
+        
+        private CurrentPaintMode _currentPaintMode = CurrentPaintMode.Draw;
         
         private NativeArray<float> _verticesValuesNative;
         private Vector3Int _cachedVertexAmount;
+        
+        private HitMeshInfo _hitInfo;
 
         protected override void GenerateMesh()
         {
@@ -91,10 +102,6 @@ namespace VoxelPainter.VoxelVisualization
         protected override void OnEnable()
         {
             base.OnEnable();
-            
-#if UNITY_EDITOR
-            EditorOnEnable();
-#endif
 
             if (_serializedDrawing == null || _allowRegeneration || _serializedDrawing.Length != VertexAmountX * VertexAmountY * VertexAmountZ)
             {
@@ -109,155 +116,190 @@ namespace VoxelPainter.VoxelVisualization
             GenerateMesh();
         }
 
-#if UNITY_EDITOR
-        private void EditorOnEnable()
+        private void ResetUserInteraction()
         {
-            EditorApplication.update -= SceneView.RepaintAll;
-            EditorApplication.update += SceneView.RepaintAll;
-            SceneView.duringSceneGui -= DuringSceneGUI;
-            SceneView.duringSceneGui += DuringSceneGUI;
+            _currentPaintMode = CurrentPaintMode.None;
         }
         
-        protected override void OnDestroy()
-        {
-            base.OnDestroy();
-            SceneView.duringSceneGui -= DuringSceneGUI;
-            EditorApplication.update -= SceneView.RepaintAll;
-        }
-
-        private void DuringSceneGUI(SceneView sceneView)
+        protected void Update()
         {
             if (_draw == false)
             {
                 return;
             }
-            Profiler.BeginSample("DrawingVisualizer.DuringSceneGUI");
 
-            Event currentEvent = Event.current;
+            ProcessUserInput();
+
+            ShowVisualIndicatorToUser();
             
-            // Check if mouse is over the scene view using position
-            HitMeshInfo hitInfo = new ();
-            Ray ray = HandleUtility.GUIPointToWorldRay(currentEvent.mousePosition);
-            if (currentEvent.mousePosition is { x: >= 0, y: >= 0 }
-                && currentEvent.mousePosition.x <= sceneView.position.width
-                && currentEvent.mousePosition.y <= sceneView.position.height)
+            ProcessUserChangingBrushSize();
+
+            ProcessUserDrawing();
+        }
+        
+        private void ShowVisualIndicatorToUser()
+        {
+            if (_currentPaintMode is CurrentPaintMode.None)
             {
-                Profiler.BeginSample("Raycast");
-                hitInfo = VoxelRaycaster.RayMarch(ray, _rayMarchStepSize, Threshold, VertexAmountX, VertexAmountY, VertexAmountZ, MarchingCubesVisualizer.ReadOnlyVerticesValuesNative, transform.position);
-                Profiler.EndSample();
+                return;
             }
             
-            // Consume mouse left down event
-            bool isLeftMouse = currentEvent.button == 0;
-            bool isRightMouse = currentEvent.button == 1;
-            bool isMiddleMouse = currentEvent.button == 2;
-
-            if (isLeftMouse && isRightMouse)
+            if (_hitInfo.IsHit == false)
             {
-                Profiler.EndSample();
+                return;
+            }
+            
+            Color color = _currentPaintMode switch
+            {
+                CurrentPaintMode.Draw => Color.green,
+                CurrentPaintMode.Erase => Color.red,
+                CurrentPaintMode.ChangeSize => Color.blue,
+                _ => Color.white
+            };
+
+            Handles.color = color;
+            Handles.color *= new Color(1, 1, 1, 0.5f);
+
+            Handles.SphereHandleCap(0, _hitInfo.HitPoint, Quaternion.identity, _mouseRadius, EventType.Repaint);
+        }
+
+        private void ProcessUserChangingBrushSize()
+        {
+            if (_currentPaintMode is not CurrentPaintMode.ChangeSize)
+            {
                 return;
             }
 
-            if (currentEvent.type is EventType.MouseDown && (isLeftMouse || isRightMouse || isMiddleMouse))
+            Vector2 mouseScreenPosition = Input.mousePosition;
+            float changeSize = ((mouseScreenPosition - _changeSizeStartPosition).magnitude - _changeSizeScreenSpaceDistance) * _changeSizeSpeed;
+            _mouseRadius = Mathf.Clamp(_mouseRadiusChangeSizeStart + changeSize, 0f, 100f);
+        }
+
+        private void ProcessUserDrawing()
+        {
+            if (_hitInfo.IsHit == false)
             {
-                if (hitInfo.IsHit)
-                {
-                    if (isMiddleMouse)
-                    {
-                        _isUserChangingSize = true;
-                        _mouseRadiusChangeSizeStart = _mouseRadius;
-                        _changeSizeScreenSpaceDistance = _mouseRadius * _cursorSizePixels;
-                        _changeSizeAnchor = hitInfo.HitPoint - Vector3.right * _mouseRadius / 2f;
-                        _changeSizeStartPosition = HandleUtility.WorldToGUIPoint(_changeSizeAnchor);
-                        _changeSizeScreenSpaceDistance = (currentEvent.mousePosition - _changeSizeStartPosition).magnitude;
-                    }
-
-                    if (isLeftMouse || isRightMouse)
-                    {
-                        _isUserDrawing = true;
-                    }
-
-                    currentEvent.Use();
-                }
-                else
-                {
-                    _isUserInteractingWithBg = true;
-                }
+                return;
             }
 
-            if (currentEvent.type is EventType.MouseUp or EventType.MouseLeaveWindow &&
-                (_isUserDrawing || _isUserInteractingWithBg || _isUserChangingSize))
+            if (_currentPaintMode is not (CurrentPaintMode.Draw or CurrentPaintMode.Erase))
             {
-                if (currentEvent.type is EventType.MouseUp && _isUserInteractingWithBg == false)
-                {
-                    currentEvent.Use();
-                }
-
-                _isUserDrawing = false;
-                _isUserInteractingWithBg = false;
-                _isUserChangingSize = false;
-            }
-
-            Vector3 hitInfoPoint = hitInfo.HitPoint;
-            hitInfoPoint += ray.direction.normalized * _mouseRadius * _offsetOfSphereDraw;
-
-            if (_isUserChangingSize)
-            {
-                float changeSize = ((currentEvent.mousePosition - _changeSizeStartPosition).magnitude - _changeSizeScreenSpaceDistance) * _changeSizeSpeed;
-                _mouseRadius = Mathf.Clamp(_mouseRadiusChangeSizeStart + changeSize, 0f, 100f);
-            }
-
-            if (_isUserInteractingWithBg == false && hitInfo.IsHit)
-            {
-                Handles.color = _isUserDrawing ? isLeftMouse ? Color.green : Color.red : _isUserChangingSize ? Color.blue : Color.white;
-                Handles.color *= new Color(1, 1, 1, 0.5f);
-                if (_isUserChangingSize)
-                {
-                    hitInfoPoint = _changeSizeAnchor;
-                }
-
-                Handles.SphereHandleCap(0, hitInfoPoint, Quaternion.identity, _mouseRadius, EventType.Repaint);
-            }
-
-            if (currentEvent.type is EventType.MouseDrag && _isUserDrawing)
-            {
-                currentEvent.Use();
-            }
-
-            if (currentEvent.type is not EventType.Layout)
-            {
-                Profiler.EndSample();
                 return;
             }
 
             // Only draw every 100ms
             float timeDrawDelay = _timeDrawDelayMs * 1000f;
-            if (DateTime.Now.Ticks - _lastTimeDraw > timeDrawDelay && _generating == false)
+            if (DateTime.Now.Ticks - _lastTimeDraw < timeDrawDelay || _generating)
             {
-                _lastTimeDraw = DateTime.Now.Ticks;
-
-                if (_isUserDrawing && currentEvent.button == 0)
-                {
-                    if (hitInfo.IsHit)
-                    {
-                        AddValue(hitInfoPoint, _mouseRadius, _valueToAdd);
-                        GenerateMesh();
-                    }
-                }
-
-                // Consume mouse right down event
-                if (_isUserDrawing && currentEvent.button == 1)
-                {
-                    if (hitInfo.IsHit)
-                    {
-                        AddValue(hitInfoPoint, _mouseRadius, _valueToAdd * -1);
-                        GenerateMesh();
-                    }
-                }
+                return;
             }
+
+            _lastTimeDraw = DateTime.Now.Ticks;
+
+            float addValue = _currentPaintMode is CurrentPaintMode.Draw ? _valueToAdd : -_valueToAdd;
+
+            AddValue(_hitInfo.HitPoint, _mouseRadius, addValue);
+            GenerateMesh();
+        }
+
+        private void ProcessUserInput()
+        {
+            Profiler.BeginSample("ProcessUserInput");
+            
+            Profiler.BeginSample("ProcessUserInput.ProcessButtonDown");
+            ProcessButtonDown();
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("ProcessUserInput.ProcessButtonUp");
+            ProcessButtonUp();
+            Profiler.EndSample();
+            
             Profiler.EndSample();
         }
-#endif
+
+        private void ProcessButtonUp()
+        {
+            bool endedDraw = Input.GetMouseButtonUp(0);
+            bool endedDelete = Input.GetMouseButtonUp(1);
+            bool endedChangeSize = Input.GetMouseButtonUp(2);
+            
+            bool stopInput = _currentPaintMode is CurrentPaintMode.Draw && endedDraw
+                             || _currentPaintMode is CurrentPaintMode.Erase && endedDelete
+                             || _currentPaintMode is CurrentPaintMode.ChangeSize && endedChangeSize;
+
+            if (!stopInput)
+            {
+                return;
+            }
+
+            ResetUserInteraction(); 
+        }
+
+        private void ProcessButtonDown()
+        {
+            _hitInfo = new HitMeshInfo();
+            
+            Vector2 mouseScreenPosition = Input.mousePosition;
+            Ray ray = _mainCamera.ScreenPointToRay(Input.mousePosition);
+            
+            if (mouseScreenPosition is { x: >= 0, y: >= 0 }
+                && mouseScreenPosition.x < Screen.width
+                && mouseScreenPosition.y < Screen.height)
+            {
+                Profiler.BeginSample("RayMarch");
+                _hitInfo = VoxelRaycaster.RayMarch(ray, _rayMarchStepSize, Threshold, VertexAmountX, VertexAmountY, VertexAmountZ, 
+                    MarchingCubesVisualizer.ReadOnlyVerticesValuesNative, transform.position);
+                Profiler.EndSample();
+            }
+            
+            bool startedToDraw = Input.GetMouseButtonDown(0);
+            bool startedToRemove = Input.GetMouseButtonDown(1);
+            bool startedToChangeSize = Input.GetMouseButtonDown(2);
+            
+            bool didPressTooManyButtons = startedToDraw && startedToRemove || startedToDraw && startedToChangeSize || startedToRemove && startedToChangeSize;
+            bool cannotStart = (startedToDraw || startedToRemove) && _hitInfo.IsHit == false;
+
+            if (didPressTooManyButtons || cannotStart)
+            {
+                ResetUserInteraction();
+                return;
+            }
+            
+            if (startedToChangeSize)
+            {
+                StartChangingSize(mouseScreenPosition);
+            }
+
+            if (startedToDraw)
+            {
+                StartDrawing();
+            }
+                    
+            if (startedToRemove)
+            {
+                StartErasing();
+            }
+        }
+
+        private void StartErasing()
+        {
+            _currentPaintMode = CurrentPaintMode.Erase;
+        }
+
+        private void StartDrawing()
+        {
+            _currentPaintMode = CurrentPaintMode.Draw;
+        }
+
+        private void StartChangingSize(Vector2 mouseScreenPosition)
+        {
+            _currentPaintMode = CurrentPaintMode.ChangeSize;
+            _mouseRadiusChangeSizeStart = _mouseRadius;
+            _changeSizeScreenSpaceDistance = _mouseRadius * _cursorSizePixels;
+            _changeSizeAnchor = _hitInfo.HitPoint - Vector3.right * _mouseRadius / 2f;
+            _changeSizeStartPosition = HandleUtility.WorldToGUIPoint(_changeSizeAnchor);
+            _changeSizeScreenSpaceDistance = (mouseScreenPosition - _changeSizeStartPosition).magnitude;
+        }
 
         private void AddValue(Vector3 position, float radius, float value)
         {

@@ -1,5 +1,6 @@
 ﻿using Unity.Collections;
 using UnityEngine;
+using UnityEngine.Profiling;
 using VoxelPainter.GridManagement;
 using VoxelPainter.VoxelVisualization;
 
