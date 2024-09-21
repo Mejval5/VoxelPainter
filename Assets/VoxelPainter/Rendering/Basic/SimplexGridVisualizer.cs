@@ -4,6 +4,11 @@ using VoxelPainter.GridManagement;
 
 namespace VoxelPainter.VoxelVisualization
 {
+    /// <summary>
+    /// This class is used to visualize a simplex grid.
+    /// Draws the grid and the vertices using GPU instancing.
+    /// Doesn't render triangles.
+    /// </summary>
     [ExecuteAlways]
     public class SimplexGridVisualizer : MonoBehaviour
     {

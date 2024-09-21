@@ -1,11 +1,11 @@
 ﻿using System;
-using Fox.Persistence;
+using Foxworks.Persistence;
+using Foxworks.Voxels;
 using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Profiling;
 using VoxelPainter.GridManagement;
-using VoxelPainter.Utils;
 using VoxelPainter.VoxelVisualization;
 
 namespace VoxelPainter.Rendering

@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using Foxworks.Voxels;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 using VoxelPainter.GridManagement;
-using VoxelPainter.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
@@ -32,6 +32,10 @@ namespace VoxelPainter.VoxelVisualization
             verticesValues = VerticesValuesNative;
         }
         
+        /// <summary>
+        /// This method is used to setup the vertices arrays.
+        /// </summary>
+        /// <param name="vertexAmount"></param>
         private void SetupVerticesArrays(Vector3Int vertexAmount)
         {
             int preAllocatedBaseVertices = vertexAmount.x * vertexAmount.y * vertexAmount.z;
@@ -56,6 +60,16 @@ namespace VoxelPainter.VoxelVisualization
             }
         }
         
+        /// <summary>
+        /// This method is used to generate the mesh on the CPU via the Marching Cubes algorithm.
+        /// </summary>
+        /// <param name="vertexAmount"></param>
+        /// <param name="threshold"></param>
+        /// <param name="gridMeshFilter"></param>
+        /// <param name="getVertexValues"></param>
+        /// <param name="maxTriangles"></param>
+        /// <param name="useLerp"></param>
+        /// <param name="enforceEmptyBorder"></param>
         public void MarchCubes(
             Vector3Int vertexAmount, 
             float threshold, 
@@ -185,6 +199,20 @@ namespace VoxelPainter.VoxelVisualization
             Profiler.EndSample();
         }
 
+        /// <summary>
+        /// This method is used to generate the mesh on the CPU.
+        /// </summary>
+        /// <param name="vertexAmount"></param>
+        /// <param name="threshold"></param>
+        /// <param name="useLerp"></param>
+        /// <param name="amountOfCubes"></param>
+        /// <param name="cubeAmountX"></param>
+        /// <param name="cubeFloor"></param>
+        /// <param name="topOffset"></param>
+        /// <param name="floorSize"></param>
+        /// <param name="middleOffset"></param>
+        /// <param name="verticesOffsets"></param>
+        /// <param name="baseVerticesOffsets"></param>
         private void MarchCubesOnCPU(Vector3Int vertexAmount, float threshold, bool useLerp, int amountOfCubes, int cubeAmountX, int cubeFloor, int topOffset, int floorSize, int middleOffset,
             int[] verticesOffsets, int[] baseVerticesOffsets)
         {

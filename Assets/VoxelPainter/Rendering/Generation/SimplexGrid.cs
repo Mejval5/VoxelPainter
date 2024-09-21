@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
+using Foxworks.Noise;
 using UnityEngine;
-using VoxelPainter.Utils;
 
 namespace VoxelPainter.GridManagement
 {

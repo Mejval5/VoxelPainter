@@ -1,10 +1,14 @@
-﻿using Unity.Collections;
+﻿using Foxworks.Noise;
+using Foxworks.Voxels;
+using Unity.Collections;
 using UnityEngine;
 using VoxelPainter.GridManagement;
-using VoxelPainter.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
+    /// <summary>
+    /// This class is used to visualize a simplex noise.
+    /// </summary>
     [ExecuteAlways]
     public class SimplexNoiseVisualizer : MarchingCubeRendererBase
     {

@@ -1,12 +1,15 @@
 ﻿using System.Linq;
+using Foxworks.Voxels;
 using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 using VoxelPainter.GridManagement;
-using VoxelPainter.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
+    /// <summary>
+    /// This class is used to visualize a single cube.
+    /// </summary>
     [ExecuteAlways]
     public class OneMarchedCubeVisualizer : MonoBehaviour
     {

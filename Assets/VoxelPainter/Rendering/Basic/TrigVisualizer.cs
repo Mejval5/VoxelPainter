@@ -1,10 +1,13 @@
-﻿using Unity.Collections;
+﻿using Foxworks.Voxels;
+using Unity.Collections;
 using UnityEngine;
 using VoxelPainter.GridManagement;
-using VoxelPainter.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
+    /// <summary>
+    /// This class is used to visualize a trigonometric function.
+    /// </summary>
     public class TrigVisualizer : MarchingCubeRendererBase
     {
         [SerializeField] private GenerationProperties _generationProperties;

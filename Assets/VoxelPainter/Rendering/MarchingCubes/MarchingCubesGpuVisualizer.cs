@@ -1,9 +1,9 @@
 ﻿using System;
+using Foxworks.Voxels;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
-using VoxelPainter.Utils;
 using VoxelPainter.VoxelVisualization;
 
 namespace VoxelPainter.Rendering.MarchingCubes
@@ -53,6 +53,10 @@ namespace VoxelPainter.Rendering.MarchingCubes
             verticesValues = _verticesValuesNative;
         }
 
+        /// <summary>
+        /// This method will setup the base vertices and the vertices values arrays.
+        /// </summary>
+        /// <param name="vertexAmount"></param>
         private void SetupVerticesArrays(Vector3Int vertexAmount)
         {
             int preAllocatedBaseVertices = vertexAmount.x * vertexAmount.y * vertexAmount.z;
@@ -77,7 +81,18 @@ namespace VoxelPainter.Rendering.MarchingCubes
             }
             Profiler.EndSample();
         }
-            
+        
+        /// <summary>
+        /// This method will march the cubes through the base vertices and render the mesh.
+        /// </summary>
+        /// <param name="vertexAmount"></param>
+        /// <param name="threshold"></param>
+        /// <param name="gridMeshFilter"></param>
+        /// <param name="getVertexValues">if you want to fill in the data during the mesh generation then you can enter them using this callback</param>
+        /// <param name="computeShader"></param>
+        /// <param name="maxTriangles"></param>
+        /// <param name="useLerp"></param>
+        /// <param name="enforceEmptyBorder"></param>
         public void MarchCubes(
             Vector3Int vertexAmount, 
             float threshold, 
@@ -143,6 +158,13 @@ namespace VoxelPainter.Rendering.MarchingCubes
             Profiler.EndSample();
         }
 
+        /// <summary>
+        /// This method will get the data from the compute shader and render it to the mesh.
+        /// </summary>
+        /// <param name="vertexAmount"></param>
+        /// <param name="gridMeshFilter"></param>
+        /// <param name="maxTriangles"></param>
+        /// <param name="preAllocatedSubVertices"></param>
         private void GetDataAndRender(Vector3Int vertexAmount, MeshFilter gridMeshFilter, int maxTriangles, int preAllocatedSubVertices)
         {
             Profiler.BeginSample("MarchingCubesVisualizer.CalculateSize");
@@ -231,6 +253,22 @@ namespace VoxelPainter.Rendering.MarchingCubes
             Profiler.EndSample();
         }
 
+        /// <summary>
+        /// This method will inject the data into the compute shader.
+        /// </summary>
+        /// <param name="vertexAmount"></param>
+        /// <param name="threshold"></param>
+        /// <param name="useLerp"></param>
+        /// <param name="floorSize"></param>
+        /// <param name="cubeAmountX"></param>
+        /// <param name="cubeAmountY"></param>
+        /// <param name="cubeAmountZ"></param>
+        /// <param name="cubeFloorSize"></param>
+        /// <param name="middleOffset"></param>
+        /// <param name="topOffset"></param>
+        /// <param name="computeShader"></param>
+        /// <param name="amountOfCubes"></param>
+        /// <param name="enforceEmptyBorder"></param>
         private void InjectDataIntoComputeShader(Vector3Int vertexAmount, float threshold, bool useLerp, int floorSize, int cubeAmountX, int cubeAmountY, int cubeAmountZ, int cubeFloorSize, int middleOffset,
             int topOffset, ComputeShader computeShader, int amountOfCubes, bool enforceEmptyBorder)
         {
@@ -252,6 +290,11 @@ namespace VoxelPainter.Rendering.MarchingCubes
             computeShader.SetBool(EnforceEmptyBorder, enforceEmptyBorder);
         }
 
+        /// <summary>
+        /// This method will dispatch the compute shader.
+        /// </summary>
+        /// <param name="amountOfCubes"></param>
+        /// <param name="computeShader"></param>
         private void DispatchComputeShader(int amountOfCubes, ComputeShader computeShader)
         {
             int kernelHandle = computeShader.FindKernel(ComputeShaderProgram);
@@ -262,6 +305,10 @@ namespace VoxelPainter.Rendering.MarchingCubes
             computeShader.Dispatch(kernelHandle, threadGroupsX, 1, 1);
         }
 
+        /// <summary>
+        /// This method will set up the base vertices values buffer.
+        /// </summary>
+        /// <param name="preAllocatedBaseVertices"></param>
         private void SetupBaseVerticesValuesBuffer(int preAllocatedBaseVertices)
         {
             const int sizeOfFloat = sizeof(float);
@@ -275,6 +322,10 @@ namespace VoxelPainter.Rendering.MarchingCubes
             _baseVerticesValuesBuffer.SetData(_verticesValuesNative);
         }
 
+        /// <summary>
+        /// This method will set up the sub vertices buffer.
+        /// </summary>
+        /// <param name="preAllocatedSubVertices"></param>
         private void SetupSubVerticesBuffer(int preAllocatedSubVertices)
         {
             const int sizeOfFloat = sizeof(float);
@@ -320,6 +371,9 @@ namespace VoxelPainter.Rendering.MarchingCubes
             _appendedTrianglesBuffer.SetCounterValue(0);
         }
 
+        /// <summary>
+        /// This method will set up the static buffers.
+        /// </summary>
         private void SetupStaticBuffers()
         {
             if (_cubeEdgeFlagsBuffer == null)
@@ -356,6 +410,10 @@ namespace VoxelPainter.Rendering.MarchingCubes
             _triangleConnectionTableBuffer.SetData(triangleConnectionTable1D);
         }
         
+        /// <summary>
+        /// This method will release the buffers.
+        /// Do not forget to call this method when you are done with the buffers.
+        /// </summary>
         public void ReleaseBuffers()
         {
             _appendedTrianglesBuffer?.Dispose();

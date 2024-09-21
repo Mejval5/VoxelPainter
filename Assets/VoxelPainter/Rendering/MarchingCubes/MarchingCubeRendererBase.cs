@@ -7,6 +7,13 @@ using VoxelPainter.Rendering.MarchingCubes;
 
 namespace VoxelPainter.VoxelVisualization
 {
+    /// <summary>
+    /// Base class for the Marching Cubes renderer.
+    /// This class is used to generate the mesh using the Marching Cubes algorithm.
+    /// It can be used to generate the mesh using the CPU or the GPU.
+    /// The GPU implementation is faster but it requires a compute shader.
+    /// The CPU implementation is slower but it doesn't require a compute shader.
+    /// </summary>
     [ExecuteAlways]
     public abstract class MarchingCubeRendererBase : MonoBehaviour
     {
@@ -51,6 +58,9 @@ namespace VoxelPainter.VoxelVisualization
             }
         }
 
+        /// <summary>
+        /// Visualizes the sub vertices.
+        /// </summary>
         private void VisualizeSubVertices()
         {
             for (int i = 0; i < MarchingCubesVisualizer.SubVertices.Length; i++)
@@ -66,6 +76,9 @@ namespace VoxelPainter.VoxelVisualization
             }
         }
 
+        /// <summary>
+        /// Visualizes the base vertices.
+        /// </summary>
         private void VisualizeBaseVertices()
         {
             NativeArray<Vector3> vertices = new();
@@ -138,6 +151,11 @@ namespace VoxelPainter.VoxelVisualization
             Profiler.EndSample();
         }
 
+        /// <summary>
+        /// This method is used to get the vertices values.
+        /// You can leave it empty if you don't need to set the vertices values or set them directly using the GetBaseVerticesNative method.
+        /// </summary>
+        /// <param name="verticesValues"></param>
         public abstract void GetVertexValues(NativeArray<float> verticesValues);
 
         protected virtual void OnDestroy()

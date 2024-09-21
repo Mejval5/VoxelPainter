@@ -1,7 +1,7 @@
 ﻿using System;
+using Foxworks.Voxels;
 using UnityEngine;
 using UnityEngine.Profiling;
-using VoxelPainter.Utils;
 
 namespace VoxelPainter.Rendering
 {
