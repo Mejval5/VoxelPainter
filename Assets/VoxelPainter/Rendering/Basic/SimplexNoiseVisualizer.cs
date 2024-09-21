@@ -29,7 +29,7 @@ namespace VoxelPainter.VoxelVisualization
 
         private static float CustomNoiseSimplex(float x, float y, float z)
         {
-            return Mathf.Clamp01(Mathf.Pow(SimplexNoise.Generate(x, y, z), 2));
+            return Mathf.Clamp01(Mathf.Pow(SimplexNoiseGenerator.Generate(x, y, z), 2));
         }
     }
 }

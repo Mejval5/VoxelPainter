@@ -138,6 +138,13 @@ namespace VoxelPainter.Rendering.MarchingCubes
             DispatchComputeShader(amountOfCubes, computeShader);
             Profiler.EndSample();
                 
+            Profiler.BeginSample("MarchingCubesVisualizer.GetDataAndRender");
+            GetDataAndRender(vertexAmount, gridMeshFilter, maxTriangles, preAllocatedSubVertices);
+            Profiler.EndSample();
+        }
+
+        private void GetDataAndRender(Vector3Int vertexAmount, MeshFilter gridMeshFilter, int maxTriangles, int preAllocatedSubVertices)
+        {
             Profiler.BeginSample("MarchingCubesVisualizer.CalculateSize");
             // Create a buffer to hold the count (size of 4 bytes for an int)
             ComputeBuffer triangleCountBuffer = new(1, sizeof(int), ComputeBufferType.Raw);

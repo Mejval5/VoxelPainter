@@ -41,6 +41,7 @@ LightingData.asset.meta
 /*.user
 /*.userprefs
 /*.csproj
+/*.csproj~
 /*.csproj.DotSettings
 /*.unityproj
 /*.booproj

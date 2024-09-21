@@ -28,11 +28,11 @@ namespace VoxelPainter.GridManagement
         {
             if (Grid == null)
             {
-                Grid = new Grid(_generationProperties, SimplexNoise.Generate);
+                Grid = new Grid(_generationProperties, SimplexNoiseGenerator.Generate);
             }
             else
             {
-                Grid.UpdateGridProperties(_generationProperties, SimplexNoise.Generate);
+                Grid.UpdateGridProperties(_generationProperties, SimplexNoiseGenerator.Generate);
             }
 
             GridPoint[] gridPoints = Grid.GridPoints;
