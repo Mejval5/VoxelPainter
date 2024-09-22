@@ -1,4 +1,6 @@
-﻿using Unity.Collections;
+﻿using System;
+using Foxworks.Utils;
+using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Profiling;
@@ -43,6 +45,9 @@ namespace VoxelPainter.VoxelVisualization
         [field: SerializeField]  public virtual bool EnforceEmptyBorder { get; private set; } = true;
         
         public Vector3Int VertexAmount => new (VertexAmountX, VertexAmountY, VertexAmountZ);
+        public bool AreComputeShadersSupported => SystemInfo.supportsComputeShaders;
+        
+        public event Action MeshGenerated = delegate { };
 
 #if UNITY_EDITOR
         private void OnDrawGizmos()
@@ -122,6 +127,8 @@ namespace VoxelPainter.VoxelVisualization
                 _marchingCubesCpuVisualizer ??= new MarchingCubesCpuVisualizer();
                 MarchingCubesVisualizer = _marchingCubesCpuVisualizer;
             }
+            
+            Debug.Log("AreComputeShadersSupported: " + AreComputeShadersSupported);
         }
 
         public virtual void GenerateMesh()
@@ -134,7 +141,7 @@ namespace VoxelPainter.VoxelVisualization
             Vector3Int vertexAmount = new (VertexAmountX, VertexAmountY, VertexAmountZ);
             
             Profiler.BeginSample("MarchCubes");
-            if (UseGpu)
+            if (UseGpu && AreComputeShadersSupported)
             {
                 _marchingCubesGpuVisualizer ??= new MarchingCubesGpuVisualizer();
                 MarchingCubesVisualizer = _marchingCubesGpuVisualizer;
@@ -148,6 +155,10 @@ namespace VoxelPainter.VoxelVisualization
                 _marchingCubesCpuVisualizer.MarchCubes(vertexAmount, Threshold, GridMeshFilter, 
                     GetVertexValues, _maxTriangles, _useLerp, EnforceEmptyBorder);
             }
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("MeshGenerated");
+            MeshGenerated.InvokeAndLogExceptions();
             Profiler.EndSample();
         }
 

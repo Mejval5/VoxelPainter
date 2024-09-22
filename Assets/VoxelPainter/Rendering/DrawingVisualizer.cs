@@ -10,12 +10,29 @@ using VoxelPainter.VoxelVisualization;
 
 namespace VoxelPainter.Rendering
 {
+    [Serializable]
+    public enum HeightmapInitType
+    {
+        PerlinNoise,
+        Texture
+    }
+    
     [ExecuteAlways]
     public class DrawingVisualizer : MarchingCubeRendererBase
     {
         [SerializeField] private bool _allowRegeneration = false;
-        [field: Range(0.1f, 10f)] [field: SerializeField] public float InitScale { get; set; } = 2f;
-        [field: Range(0.1f, 10f)] [field: SerializeField] public float InitFrequency { get; set; } = 2f;
+        [SerializeField] private HeightmapInitType _heightmapInitType;
+        
+        [field: Header("Perlin Noise Parameters")]
+        [field: Range(0f, 100f)] [field: SerializeField] public float InitOffset { get; set; } = 0f;
+        [field: Range(1f, 100f)] [field: SerializeField] public float InitScale { get; set; } = 2f;
+        [field: Range(1f, 100f)] [field: SerializeField] public float InitFrequency { get; set; } = 2f;
+        
+        [Header("Texture Sample Parameters")]
+        [SerializeField] private Texture2D _texture2D;
+        [SerializeField] private float _textureScale = 1f;
+        [SerializeField] private float _textureOffset = 1f;
+        [SerializeField] private float _textureScalePower = 1f;
 
         private NativeArray<float> _verticesValuesNative;
         private Vector3Int _cachedVertexAmount;
@@ -93,6 +110,46 @@ namespace VoxelPainter.Rendering
         private void InitDrawing()
         {
             Profiler.BeginSample("InitDrawing");
+            if (_heightmapInitType == HeightmapInitType.PerlinNoise)
+            {
+                InitDrawingUsingPerlinNoise();
+            }
+            else
+            {
+                InitDrawingUsingTexture();
+            }
+            Profiler.EndSample();
+        }
+
+        private void InitDrawingUsingTexture()
+        {
+            if (_texture2D == null)
+            {
+                Debug.LogWarning("Texture2D is null. Initialized painting using perlin noise.");
+                InitDrawingUsingPerlinNoise();
+                return;
+            }
+
+            for (int x = 0; x < VertexAmountX; x++)
+            {
+                for (int y = 0; y < VertexAmountY; y++)
+                {
+                    for (int z = 0; z < VertexAmountZ; z++)
+                    {
+                        Vector3Int pos = new(x, y, z);
+                        float valueThreshold = _texture2D.GetPixelBilinear(x / (float) VertexAmountX, z / (float) VertexAmountZ).r;
+                        valueThreshold = Mathf.Pow(valueThreshold, _textureScalePower);
+                        valueThreshold = valueThreshold * _textureScale + _textureOffset;
+                        valueThreshold *= VertexAmountY;
+                        float value = 1f - y / valueThreshold * Threshold;
+                        WriteIntoGrid(pos, value);
+                    }
+                }
+            }
+        }
+
+        private void InitDrawingUsingPerlinNoise()
+        {
             for (int x = 0; x < VertexAmountX; x++)
             {
                 for (int y = 0; y < VertexAmountY; y++)
@@ -106,7 +163,6 @@ namespace VoxelPainter.Rendering
                     }
                 }
             }
-            Profiler.EndSample();
         }
 
         public void WriteIntoGrid(Vector3Int pos, float value)
@@ -117,6 +173,11 @@ namespace VoxelPainter.Rendering
 
         public void WriteIntoGrid(int index, float value)
         {
+            if (_verticesValuesNative.IsCreated == false)
+            {
+                return;
+            }
+            
             _verticesValuesNative[index] = value;
         }
 

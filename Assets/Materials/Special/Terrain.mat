@@ -24,6 +24,10 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - _ColorMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _SampleCubemap_4042bcd3cf2f487ebdd0e957bfe9799e_Cube_1_Cubemap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -46,11 +50,13 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _AO: 0
-    - _BaseHeight: 19
-    - _HeighScale: 5
+    - _AO: 1
+    - _BaseHeight: 0
+    - _HeighScale: 18.9
+    - _HeightScale: 50
     - _Metallic: 0
     - _NoiseBase: 0
+    - _NoiseModifier: 0.675
     - _NoiseScale: 50
     - _NoiseSize: 0.1
     - _QueueControl: 0
@@ -60,6 +66,7 @@ Material:
     m_Colors:
     - _ConstantLight: {r: 0, g: 0, b: 0, a: 0.49411765}
     - _Emission: {r: 0, g: 0, b: 0, a: 0}
+    - _SpecularColor: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []
 --- !u!114 &2811786835505714016
 MonoBehaviour:

@@ -48,7 +48,7 @@ Material:
     m_Floats:
     - _AO: 0
     - _BaseColor: 0
-    - _BaseHeight: -200
+    - _BaseHeight: 0
     - _HeighScale: 1.5
     - _Metallic: 0
     - _NoiseBase: 0
