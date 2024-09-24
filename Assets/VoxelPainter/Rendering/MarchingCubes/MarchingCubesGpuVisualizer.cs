@@ -30,7 +30,7 @@ namespace VoxelPainter.Rendering.MarchingCubes
         
         private int[] _triangleIndices;
 
-        private NativeArray<float> _verticesValuesNative;
+        private NativeArray<int> _verticesValuesNative;
         private NativeArray<Vector3> _baseVerticesNative;
         
         private ComputeBuffer _appendedTrianglesBuffer;
@@ -47,7 +47,7 @@ namespace VoxelPainter.Rendering.MarchingCubes
             vertices = _baseVerticesNative;
         }
         
-        public void GetVerticesValuesNative(ref NativeArray<float> verticesValues, Vector3Int vertexAmount)
+        public void GetVerticesValuesNative(ref NativeArray<int> verticesValues, Vector3Int vertexAmount)
         {
             SetupVerticesArrays(vertexAmount);
             verticesValues = _verticesValuesNative;
@@ -67,7 +67,7 @@ namespace VoxelPainter.Rendering.MarchingCubes
             }
 
             _baseVerticesNative = new NativeArray<Vector3>(preAllocatedBaseVertices, Allocator.Persistent);
-            _verticesValuesNative = new NativeArray<float>(preAllocatedBaseVertices, Allocator.Persistent);
+            _verticesValuesNative = new NativeArray<int>(preAllocatedBaseVertices, Allocator.Persistent);
             Profiler.BeginSample("MarchingCubesVisualizer.SetUpVertices");
             int floorSize = vertexAmount.x * vertexAmount.z;
             for (int i = 0; i < preAllocatedBaseVertices; i++)
@@ -97,7 +97,7 @@ namespace VoxelPainter.Rendering.MarchingCubes
             Vector3Int vertexAmount, 
             float threshold, 
             MeshFilter gridMeshFilter,
-            Action<NativeArray<float>> getVertexValues,
+            Action<NativeArray<int>> getVertexValues,
             ComputeShader computeShader,
             int maxTriangles = int.MaxValue,
             bool useLerp = true,
@@ -311,12 +311,12 @@ namespace VoxelPainter.Rendering.MarchingCubes
         /// <param name="preAllocatedBaseVertices"></param>
         private void SetupBaseVerticesValuesBuffer(int preAllocatedBaseVertices)
         {
-            const int sizeOfFloat = sizeof(float);
+            const int sizeOfInt = sizeof(int);
 
             if (_baseVerticesValuesBuffer == null || _baseVerticesValuesBuffer.count != preAllocatedBaseVertices)
             {
                 _baseVerticesValuesBuffer?.Dispose();
-                _baseVerticesValuesBuffer = new ComputeBuffer(preAllocatedBaseVertices, sizeOfFloat);
+                _baseVerticesValuesBuffer = new ComputeBuffer(preAllocatedBaseVertices, sizeOfInt);
             }
             
             _baseVerticesValuesBuffer.SetData(_verticesValuesNative);

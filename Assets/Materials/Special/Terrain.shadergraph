@@ -2600,7 +2600,7 @@
         "m_SerializableColors": []
     },
     "m_filter": 1,
-    "m_wrap": 0,
+    "m_wrap": 1,
     "m_aniso": 0
 }
 

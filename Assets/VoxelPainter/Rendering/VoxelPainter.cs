@@ -2,6 +2,7 @@
 using Foxworks.Voxels;
 using UnityEngine;
 using UnityEngine.Profiling;
+using VoxelPainter.Rendering.Utils;
 
 namespace VoxelPainter.Rendering
 {
@@ -213,7 +214,7 @@ namespace VoxelPainter.Rendering
         {
             bool endedDraw = Input.GetMouseButtonUp(0);
             bool endedDelete = Input.GetMouseButtonUp(1);
-            bool endedChangeSize = Input.GetMouseButtonUp(2);
+            bool endedChangeSize = Input.GetKeyUp(KeyCode.LeftControl) || Input.GetMouseButtonUp(1);
             
             bool stopInput = _currentPaintMode is CurrentPaintMode.Draw && endedDraw
                              || _currentPaintMode is CurrentPaintMode.Erase && endedDelete
@@ -231,9 +232,15 @@ namespace VoxelPainter.Rendering
         {
             bool startedToDraw = Input.GetMouseButtonDown(0);
             bool startedToRemove = Input.GetMouseButtonDown(1);
-            bool startedToChangeSize = Input.GetMouseButtonDown(2);
+            bool startedToChangeSize = Input.GetKey(KeyCode.LeftControl) && Input.GetMouseButtonDown(1);
             
-            bool didPressTooManyButtons = startedToDraw && startedToRemove || startedToDraw && startedToChangeSize || startedToRemove && startedToChangeSize;
+            // Override removal if changing size
+            if (startedToChangeSize)
+            {
+                startedToRemove = false;
+            }
+            
+            bool didPressTooManyButtons = startedToDraw && startedToRemove || startedToDraw && startedToChangeSize;
             bool cannotStart = (startedToDraw || startedToRemove) && _hitInfo.IsHit == false;
 
             if (didPressTooManyButtons || cannotStart)
@@ -306,7 +313,8 @@ namespace VoxelPainter.Rendering
                             continue;
                         }
 
-                        float writeValue = Mathf.Clamp(_drawingVisualizer.VerticesValuesNative[index] + additionAmount, 0, 1);
+                        float writtenValue = VoxelDataUtils.UnpackValue(_drawingVisualizer.VerticesValuesNative[index]);
+                        float writeValue = Mathf.Clamp(writtenValue + additionAmount, 0, 1);
                         _drawingVisualizer.WriteIntoGrid(index, writeValue);
                     }
                 }

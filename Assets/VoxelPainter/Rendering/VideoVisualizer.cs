@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Video;
 using VoxelPainter.GridManagement;
+using VoxelPainter.Rendering.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
@@ -75,7 +76,7 @@ namespace VoxelPainter.VoxelVisualization
             GenerateMesh();
         }
         
-        public override void GetVertexValues(NativeArray<float> verticesValues)
+        public override void GetVertexValues(NativeArray<int> verticesValues)
         {
             int floorSize = VertexAmountX * VertexAmountZ;
             Vector3Int vertexAmount = VertexAmount;
@@ -87,7 +88,7 @@ namespace VoxelPainter.VoxelVisualization
                 // Ensure the texture is available
                 if (_videoFrameTexture == null)
                 {
-                    verticesValues[i] = 0f;
+                    verticesValues[i] = VoxelDataUtils.PackValueAndVertexId(0f, 0);
                     continue;
                 }
 
@@ -133,7 +134,7 @@ namespace VoxelPainter.VoxelVisualization
                 }
                 
                 Profiler.EndSample();
-                verticesValues[i] = finalValue;
+                verticesValues[i] = VoxelDataUtils.PackValueAndVertexId(finalValue);
             }
         }
 

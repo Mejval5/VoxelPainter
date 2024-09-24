@@ -11,13 +11,13 @@ namespace VoxelPainter.VoxelVisualization
 {
     public class MarchingCubesCpuVisualizer : IMarchingCubesVisualizer
     {
-        public NativeArray<float> VerticesValuesNative;
+        public NativeArray<int> VerticesValuesNative;
         public NativeArray<Vector3> BaseVerticesNative;
         public Vector3[] SubVertices { get; private set; }
         public List<int> Triangles { get; private set; }
         public int[] ValidTriangles { get; private set; }
 
-        public NativeArray<float> ReadOnlyVerticesValuesNative => VerticesValuesNative;
+        public NativeArray<int> ReadOnlyVerticesValuesNative => VerticesValuesNative;
         public NativeArray<Vector3> ReadOnlyBaseVertices => BaseVerticesNative;
         
         public void GetBaseVerticesNative(ref NativeArray<Vector3> vertices, Vector3Int vertexAmount)
@@ -26,7 +26,7 @@ namespace VoxelPainter.VoxelVisualization
             vertices = BaseVerticesNative;
         }
         
-        public void GetVerticesValuesNative(ref NativeArray<float> verticesValues, Vector3Int vertexAmount)
+        public void GetVerticesValuesNative(ref NativeArray<int> verticesValues, Vector3Int vertexAmount)
         {
             SetupVerticesArrays(vertexAmount);
             verticesValues = VerticesValuesNative;
@@ -46,7 +46,7 @@ namespace VoxelPainter.VoxelVisualization
             }
 
             BaseVerticesNative = new NativeArray<Vector3>(preAllocatedBaseVertices, Allocator.Persistent);
-            VerticesValuesNative = new NativeArray<float>(preAllocatedBaseVertices, Allocator.Persistent);
+            VerticesValuesNative = new NativeArray<int>(preAllocatedBaseVertices, Allocator.Persistent);
                 
             int floorSize = vertexAmount.x * vertexAmount.z;
             for (int i = 0; i < preAllocatedBaseVertices; i++)
@@ -74,7 +74,7 @@ namespace VoxelPainter.VoxelVisualization
             Vector3Int vertexAmount, 
             float threshold, 
             MeshFilter gridMeshFilter,
-            Action<NativeArray<float>> getVertexValues,
+            Action<NativeArray<int>> getVertexValues,
             int maxTriangles = int.MaxValue,
             bool useLerp = true,
             bool enforceEmptyBorder = true)

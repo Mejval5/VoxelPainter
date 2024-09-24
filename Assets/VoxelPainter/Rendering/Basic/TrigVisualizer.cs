@@ -2,6 +2,7 @@
 using Unity.Collections;
 using UnityEngine;
 using VoxelPainter.GridManagement;
+using VoxelPainter.Rendering.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
@@ -12,7 +13,7 @@ namespace VoxelPainter.VoxelVisualization
     {
         [SerializeField] private GenerationProperties _generationProperties;
         
-        public override void GetVertexValues(NativeArray<float> verticesValues)
+        public override void GetVertexValues(NativeArray<int> verticesValues)
         {
             int floorSize = VertexAmountX * VertexAmountZ;
             Vector3Int vertexAmount = VertexAmount;
@@ -24,7 +25,7 @@ namespace VoxelPainter.VoxelVisualization
                 float y = (position.y + _generationProperties.Origin.y) * _generationProperties.Frequency / 1000f;
                 float z = (position.z + _generationProperties.Origin.z) * _generationProperties.Frequency / 1000f;
             
-                verticesValues[i] = (Mathf.Sin(x) + Mathf.Cos(y) + Mathf.Cos(z) + 3) / 6f;
+                verticesValues[i] = VoxelDataUtils.PackValueAndVertexId((Mathf.Sin(x) + Mathf.Cos(y) + Mathf.Cos(z) + 3) / 6f);
             }
         }
     }

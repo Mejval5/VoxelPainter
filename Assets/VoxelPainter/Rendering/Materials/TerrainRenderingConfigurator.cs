@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
-using VoxelPainter.Rendering;
 
-namespace VoxelPainter.GridManagement
+namespace VoxelPainter.Rendering.Materials
 {
     [Serializable]
     public struct ColorBreakpoint
@@ -64,6 +61,11 @@ namespace VoxelPainter.GridManagement
             _drawingVisualizer.MeshGenerated -= GenerateTerrainTexture;
             _drawingVisualizer.MeshGenerated += GenerateTerrainTexture;
         }
+
+        protected void Update()
+        {
+            AssignColors();
+        }
         
         private void OnDisable()
         {
@@ -96,6 +98,11 @@ namespace VoxelPainter.GridManagement
             _texture2D.SetPixels(_colors);
             _texture2D.Apply();
             
+            AssignColors();
+        }
+
+        private void AssignColors()
+        {
             _sharedMaterial.SetTexture(ColorMap, _texture2D);
             _sharedMaterial.SetFloat(BaseHeight, _drawingVisualizer.transform.position.y);
             _sharedMaterial.SetFloat(HeightScale, _drawingVisualizer.VertexAmountY);

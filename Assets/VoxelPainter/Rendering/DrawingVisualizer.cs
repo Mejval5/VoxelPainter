@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using Foxworks.Persistence;
 using Foxworks.Voxels;
 using Unity.Collections;
@@ -6,7 +7,9 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Profiling;
 using VoxelPainter.GridManagement;
+using VoxelPainter.Rendering.Utils;
 using VoxelPainter.VoxelVisualization;
+using Debug = UnityEngine.Debug;
 
 namespace VoxelPainter.Rendering
 {
@@ -16,10 +19,18 @@ namespace VoxelPainter.Rendering
         PerlinNoise,
         Texture
     }
+
+    [Serializable]
+    public class PaintingSaveData
+    {
+        public int[] VerticesValues;
+        public Vector3Int VertexAmount;
+    }
     
     [ExecuteAlways]
     public class DrawingVisualizer : MarchingCubeRendererBase
     {
+        private const long AutoSaveTimer = 1000;
         [SerializeField] private bool _allowRegeneration = false;
         [SerializeField] private HeightmapInitType _heightmapInitType;
         
@@ -34,13 +45,15 @@ namespace VoxelPainter.Rendering
         [SerializeField] private float _textureOffset = 1f;
         [SerializeField] private float _textureScalePower = 1f;
 
-        private NativeArray<float> _verticesValuesNative;
+        private NativeArray<int> _verticesValuesNative;
         private Vector3Int _cachedVertexAmount;
         
-        public NativeArray<float> VerticesValuesNative => _verticesValuesNative;
+        public NativeArray<int> VerticesValuesNative => _verticesValuesNative;
         
         public bool Generating { get; private set; }
 
+        private readonly Stopwatch _saveStopwatch = new();
+        
         public override void GenerateMesh()
         {
             try
@@ -79,32 +92,64 @@ namespace VoxelPainter.Rendering
 
         public void Save()
         {
-            SaveManager.Save("drawing", _verticesValuesNative.ToArray());
-            SaveManager.Save("drawingParameters", _cachedVertexAmount);
+            PaintingSaveData saveData = new()
+            {
+                VerticesValues = _verticesValuesNative.ToArray(),
+                VertexAmount = _cachedVertexAmount
+            };
+            
+            SaveManager.Save("drawing", saveData);
         }
 
-        public void Load()
+        public bool Load()
         {
             MarchingCubesVisualizer.GetVerticesValuesNative(ref _verticesValuesNative, new Vector3Int(VertexAmountX, VertexAmountY, VertexAmountZ));
             
-            float[] verticesValues = SaveManager.Load<float[]>("drawing");
-            if (verticesValues == null)
+            PaintingSaveData saveData = SaveManager.Load<PaintingSaveData>("drawing");
+            if (saveData == null)
             {
-                return;
+                return false;
+            }
+
+            if (saveData.VerticesValues == null)
+            {
+                return false;
             }
             
-            _verticesValuesNative.CopyFrom(verticesValues);
+            _verticesValuesNative.CopyFrom(saveData.VerticesValues);
             
-            _cachedVertexAmount = SaveManager.Load<Vector3Int>("drawingParameters");
+            _cachedVertexAmount = saveData.VertexAmount;
+            return true;
         }
         
         protected override void OnEnable()
         {
             base.OnEnable();
 
-            Load();
+            bool didLoadSomething = Load();
+            
+            if (didLoadSomething == false)
+            {
+                InitDrawing();
+            }
 
             GenerateMesh();
+        }
+
+        protected void Update()
+        {
+            if (_saveStopwatch.IsRunning == false)
+            {
+                _saveStopwatch.Restart();
+            }
+            
+            if (_saveStopwatch.ElapsedMilliseconds <= AutoSaveTimer)
+            {
+                return;
+            }
+
+            Save();
+            _saveStopwatch.Restart();
         }
 
         private void InitDrawing()
@@ -141,7 +186,7 @@ namespace VoxelPainter.Rendering
                         valueThreshold = Mathf.Pow(valueThreshold, _textureScalePower);
                         valueThreshold = valueThreshold * _textureScale + _textureOffset;
                         valueThreshold *= VertexAmountY;
-                        float value = 1f - y / valueThreshold * Threshold;
+                        float value = (2f - y / valueThreshold) * Threshold;
                         WriteIntoGrid(pos, value);
                     }
                 }
@@ -178,10 +223,10 @@ namespace VoxelPainter.Rendering
                 return;
             }
             
-            _verticesValuesNative[index] = value;
+            _verticesValuesNative[index] = VoxelDataUtils.PackValueAndVertexId(value, 0);
         }
 
-        public override void GetVertexValues(NativeArray<float> verticesValues)
+        public override void GetVertexValues(NativeArray<int> verticesValues)
         {
             // Do nothing
         }

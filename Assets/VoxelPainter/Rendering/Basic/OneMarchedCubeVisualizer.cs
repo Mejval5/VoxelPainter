@@ -4,6 +4,7 @@ using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 using VoxelPainter.GridManagement;
+using VoxelPainter.Rendering.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
@@ -68,9 +69,9 @@ namespace VoxelPainter.VoxelVisualization
             _marchingCubesCpuVisualizer.MarchCubes(vertexAmount, _surface, _meshFilter, GetVertexValues, enforceEmptyBorder: false);
         }
         
-        private void GetVertexValues(NativeArray<float> verticesValues)
+        private void GetVertexValues(NativeArray<int> verticesValues)
         {
-            verticesValues.CopyFrom(Cube.Corners.Select(corner => corner.value).ToArray());
+            verticesValues.CopyFrom(Cube.Corners.Select(corner => VoxelDataUtils.PackValueAndVertexId(corner.value)).ToArray());
         }
 
 #if UNITY_EDITOR

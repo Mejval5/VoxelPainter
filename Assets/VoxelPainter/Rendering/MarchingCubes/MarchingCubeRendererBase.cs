@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.Profiling;
 using VoxelPainter.GridManagement;
 using VoxelPainter.Rendering.MarchingCubes;
+using VoxelPainter.Rendering.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
@@ -87,7 +88,7 @@ namespace VoxelPainter.VoxelVisualization
         private void VisualizeBaseVertices()
         {
             NativeArray<Vector3> vertices = new();
-            NativeArray<float> verticesValues = new();
+            NativeArray<int> verticesValues = new();
             MarchingCubesVisualizer.GetBaseVerticesNative(ref vertices, VertexAmount);
             MarchingCubesVisualizer.GetVerticesValuesNative(ref verticesValues, VertexAmount);
             
@@ -95,7 +96,7 @@ namespace VoxelPainter.VoxelVisualization
             {
                 Vector3 pos = vertices[i];
                 Gizmos.color = Color.Lerp(Color.black, Color.white, verticesValues[i]);
-                if (verticesValues[i] < Threshold)
+                if (VoxelDataUtils.UnpackValue(verticesValues[i]) < Threshold)
                 {
                     Gizmos.color *= Color.red;
                 }
@@ -167,7 +168,7 @@ namespace VoxelPainter.VoxelVisualization
         /// You can leave it empty if you don't need to set the vertices values or set them directly using the GetBaseVerticesNative method.
         /// </summary>
         /// <param name="verticesValues"></param>
-        public abstract void GetVertexValues(NativeArray<float> verticesValues);
+        public abstract void GetVertexValues(NativeArray<int> verticesValues);
 
         protected virtual void OnDestroy()
         {

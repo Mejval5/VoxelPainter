@@ -1,0 +1,59 @@
+﻿#pragma kernel CSMain
+#pragma target 5.0
+
+RWStructuredBuffer<int> BaseVerticesValues;
+
+int AmountOfVertices;
+int4 VertexAmount; // w represents the cube floor
+bool EnforceEmptyBorder;
+
+static const int ValueBits = 10; // First bits store value as 0f-1f
+static const int VertexIdBits = 8; // We consider next bits for vertex id, this is used to encode special data
+static const float ValueMultiplier = 1.0f / 1023.0f; // 1023 is the maximum value that can be stored in 10 bits
+
+int3 ConvertIndexToPosition(uint i, uint floorSize)
+{
+    uint3 pos = int3(0, 0, 0);
+    pos.x = i % VertexAmount.x;
+    pos.z  = (i % floorSize) / VertexAmount.x;
+    pos.y  = i / floorSize;
+            
+    return pos;
+}
+
+float GetBaseVerticesValue(uint index)
+{
+    if (EnforceEmptyBorder)
+    {
+        int3 pos = ConvertIndexToPosition(index, VertexAmount.x * VertexAmount.z);
+        if (pos.x == 0 || pos.x == VertexAmount.x - 1 || pos.y == 0 || pos.y == VertexAmount.y - 1 || pos.z == 0 || pos.z == VertexAmount.z - 1)
+        {
+            return 0;
+        }
+    }
+    
+    int encodedValue = BaseVerticesValues[index];
+
+    // Extract the last 10 bits (mask with 0x3FF = 1023, which is 10 bits of 1s)
+    int last10BitsValue = encodedValue & 0x3FF;  // This extracts the last 10 bits
+
+    // Convert the 10 bits to a float value between 0 and 1
+    return last10BitsValue * ValueMultiplier;
+}
+
+// Define the main compute function
+[numthreads(32, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    uint index = id.x;
+    
+    if (index >= (uint) AmountOfVertices)
+    {
+        return;
+    }
+
+    int xIndex = index % VertexAmount.x;
+    int zIndex = (index % VertexAmount.w) / VertexAmount.x;
+    int yIndex = index / VertexAmount.w;
+}
+
