@@ -20,7 +20,7 @@ namespace VoxelPainter.VoxelVisualization
     [ExecuteAlways]
     public abstract class MarchingCubeRendererBase : MonoBehaviour
     {
-        [SerializeField] private bool _useLerp = true;
+        [SerializeField] private bool _lerp = true;
         [SerializeField] private bool _visualizeBaseVertices;
         [SerializeField] private bool _visualizeSubVertices;
         [SerializeField] private float _gizmoSize = 0.075f;
@@ -35,8 +35,9 @@ namespace VoxelPainter.VoxelVisualization
         [field: SerializeField] public ComputeShader MarchingCubeComputeShader { get; private set; }
         
         [field: SerializeField] public MeshFilter GridMeshFilter { get; private set; }
-        [field: Range(0.01f,1f)]
-        [field: SerializeField] public float Threshold { get; private set; } = 0.5f;
+        
+        [Range(0.01f,1f)] [SerializeField] public float _threshold  = 0.5f;
+        
         [field: Range(2, 300)]
         [field: SerializeField] public int VertexAmountX { get; private set; } = 50;
         [field: Range(2, 300)]
@@ -49,6 +50,29 @@ namespace VoxelPainter.VoxelVisualization
         public bool AreComputeShadersSupported => SystemInfo.supportsComputeShaders;
         
         public event Action MeshGenerated = delegate { };
+        
+        public event Action<float> ThresholdChanged = delegate { };
+        public event Action<bool> LerpChanged = delegate { };
+        
+        public bool Lerp
+        {
+            set
+            {
+                _lerp = value;
+                LerpChanged.Invoke(value);
+            }
+            get => _lerp;
+        }
+        
+        public float Threshold
+        {
+            set
+            {
+                ThresholdChanged.Invoke(value);
+                _threshold = value;
+            }
+            get => _threshold;
+        }
 
 #if UNITY_EDITOR
         private void OnDrawGizmos()
@@ -128,8 +152,6 @@ namespace VoxelPainter.VoxelVisualization
                 _marchingCubesCpuVisualizer ??= new MarchingCubesCpuVisualizer();
                 MarchingCubesVisualizer = _marchingCubesCpuVisualizer;
             }
-            
-            Debug.Log("AreComputeShadersSupported: " + AreComputeShadersSupported);
         }
 
         public virtual void GenerateMesh()
@@ -147,14 +169,14 @@ namespace VoxelPainter.VoxelVisualization
                 _marchingCubesGpuVisualizer ??= new MarchingCubesGpuVisualizer();
                 MarchingCubesVisualizer = _marchingCubesGpuVisualizer;
                 _marchingCubesGpuVisualizer.MarchCubes(vertexAmount, Threshold, GridMeshFilter, 
-                    GetVertexValues, MarchingCubeComputeShader, _maxTriangles, _useLerp, EnforceEmptyBorder);
+                    GetVertexValues, MarchingCubeComputeShader, _maxTriangles, _lerp, EnforceEmptyBorder);
             }
             else
             {
                 _marchingCubesCpuVisualizer ??= new MarchingCubesCpuVisualizer();
                 MarchingCubesVisualizer = _marchingCubesCpuVisualizer;
                 _marchingCubesCpuVisualizer.MarchCubes(vertexAmount, Threshold, GridMeshFilter, 
-                    GetVertexValues, _maxTriangles, _useLerp, EnforceEmptyBorder);
+                    GetVertexValues, _maxTriangles, _lerp, EnforceEmptyBorder);
             }
             Profiler.EndSample();
             

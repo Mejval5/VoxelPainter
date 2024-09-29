@@ -2,7 +2,10 @@
     "name": "VoxelPainter",
     "rootNamespace": "",
     "references": [
-        "Foxworks"
+        "Foxworks",
+        "Cinemachine",
+        "NaughtyAttributes.Core",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

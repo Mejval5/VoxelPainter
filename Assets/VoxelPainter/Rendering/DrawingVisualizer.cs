@@ -1,12 +1,15 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Linq;
 using Foxworks.Persistence;
 using Foxworks.Voxels;
 using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Profiling;
-using VoxelPainter.GridManagement;
 using VoxelPainter.Rendering.Utils;
 using VoxelPainter.VoxelVisualization;
 using Debug = UnityEngine.Debug;
@@ -26,11 +29,18 @@ namespace VoxelPainter.Rendering
         public int[] VerticesValues;
         public Vector3Int VertexAmount;
     }
+
+    [Serializable]
+    public class PaintingSaveHistoryData
+    {
+        public List<string> SaveNames = new();
+    }
     
     [ExecuteAlways]
     public class DrawingVisualizer : MarchingCubeRendererBase
     {
-        private const long AutoSaveTimer = 1000;
+        private const string DrawingHistorySaveKey = "drawing_history";
+        
         [SerializeField] private bool _allowRegeneration = false;
         [SerializeField] private HeightmapInitType _heightmapInitType;
         
@@ -45,14 +55,39 @@ namespace VoxelPainter.Rendering
         [SerializeField] private float _textureOffset = 1f;
         [SerializeField] private float _textureScalePower = 1f;
 
+        [NaughtyAttributes.ReadOnly] [SerializeField] private string _currentSaveName;
+        [NaughtyAttributes.ReadOnly] [SerializeField] private PaintingSaveHistoryData _paintingSaveHistoryData;
+        
         private NativeArray<int> _verticesValuesNative;
         private Vector3Int _cachedVertexAmount;
         
         public NativeArray<int> VerticesValuesNative => _verticesValuesNative;
         
         public bool Generating { get; private set; }
+        
+        private readonly ObservableCollection<PaintingSaveData> _undoStack = new();
+        private readonly ObservableCollection<PaintingSaveData> _redoStack = new();
+        
+        public int UndoCount => _undoStack.Count;
+        public int RedoCount => _redoStack.Count;
+        
+        public event Action UndoRedoStateChanged = delegate { };
 
-        private readonly Stopwatch _saveStopwatch = new();
+        public DrawingVisualizer()
+        {
+            _undoStack.CollectionChanged += OnUndoCollectionChanged;
+            _redoStack.CollectionChanged += OnRedoCollectionChanged;
+        }
+
+        private void OnUndoCollectionChanged(object _, NotifyCollectionChangedEventArgs __)
+        {
+            UndoRedoStateChanged.Invoke();
+        }
+
+        private void OnRedoCollectionChanged(object _, NotifyCollectionChangedEventArgs __)
+        {
+            UndoRedoStateChanged.Invoke();
+        }
         
         public override void GenerateMesh()
         {
@@ -74,7 +109,7 @@ namespace VoxelPainter.Rendering
 
                 if (_allowRegeneration || didChange)
                 {
-                    InitDrawing();
+                    CreateNewDrawing();
                 }
 
                 base.GenerateMesh();
@@ -90,70 +125,176 @@ namespace VoxelPainter.Rendering
             }
         }
 
+        public void StartDrawing()
+        {
+            _redoStack.Clear();
+        }
+
+        public void StopDrawing()
+        {
+            Save();
+            CreateUndoPoint();
+        }
+
+        public void Undo()
+        {
+            if (_undoStack.Count == 0)
+            {
+                return;
+            }
+
+            PaintingSaveData saveData = _undoStack.Last();
+            _undoStack.Remove(saveData);
+            _redoStack.Add(saveData);
+            
+            _verticesValuesNative.CopyFrom(saveData.VerticesValues);
+            _cachedVertexAmount = saveData.VertexAmount;
+            
+            GenerateMesh();
+        }
+
+        public void Redo()
+        {
+            if (_redoStack.Count == 0)
+            {
+                return;
+            }
+
+            PaintingSaveData saveData = _redoStack.Last();
+            _redoStack.Remove(saveData);
+            _undoStack.Add(saveData);
+            
+            _verticesValuesNative.CopyFrom(saveData.VerticesValues);
+            _cachedVertexAmount = saveData.VertexAmount;
+            
+            GenerateMesh();
+        }
+
+        private void CreateUndoPoint()
+        {
+            Profiler.BeginSample("CreateUndoSavePoint");
+            PaintingSaveData saveData = new()
+            {
+                VerticesValues = _verticesValuesNative.ToArray(),
+                VertexAmount = _cachedVertexAmount
+            };
+
+            _undoStack.Add(saveData);
+            Profiler.EndSample();
+        }
+
         public void Save()
         {
+            if (_verticesValuesNative.IsCreated == false)
+            {
+                return;
+            }
+            
+            if (string.IsNullOrEmpty(_currentSaveName))
+            {
+                return;
+            }
+            
+            Profiler.BeginSample("SaveDrawing");
             PaintingSaveData saveData = new()
             {
                 VerticesValues = _verticesValuesNative.ToArray(),
                 VertexAmount = _cachedVertexAmount
             };
             
-            SaveManager.Save("drawing", saveData);
+            if (_paintingSaveHistoryData.SaveNames.Contains(_currentSaveName) == false)
+            {
+                _paintingSaveHistoryData.SaveNames.Add(_currentSaveName);
+            }
+            
+            SaveManager.Save(DrawingHistorySaveKey, _paintingSaveHistoryData);
+            SaveManager.Save(_currentSaveName, saveData);
+            Profiler.EndSample();
         }
 
-        public bool Load()
+        private bool Load(string paintingName)
         {
+            Save();
+            
+            Profiler.BeginSample("LoadDrawing");
             MarchingCubesVisualizer.GetVerticesValuesNative(ref _verticesValuesNative, new Vector3Int(VertexAmountX, VertexAmountY, VertexAmountZ));
             
-            PaintingSaveData saveData = SaveManager.Load<PaintingSaveData>("drawing");
-            if (saveData == null)
-            {
-                return false;
-            }
+            PaintingSaveData saveData = SaveManager.Load<PaintingSaveData>(paintingName);
 
-            if (saveData.VerticesValues == null)
+            if (saveData?.VerticesValues == null)
             {
+                Profiler.EndSample();
                 return false;
             }
             
             _verticesValuesNative.CopyFrom(saveData.VerticesValues);
             
             _cachedVertexAmount = saveData.VertexAmount;
+            
+            _currentSaveName = paintingName;
+            
+            _undoStack.Clear();
+            _undoStack.Add(saveData);
+            
+            Profiler.EndSample();
             return true;
+        }
+
+        private bool LoadLast()
+        {
+            _paintingSaveHistoryData = LoadSaveHistoryData();
+
+            return _paintingSaveHistoryData.SaveNames.Any() && Load(_paintingSaveHistoryData.SaveNames.Last());
+        }
+        
+        private PaintingSaveHistoryData LoadSaveHistoryData()
+        {
+            PaintingSaveHistoryData paintingSaveHistoryData = SaveManager.Load<PaintingSaveHistoryData>(DrawingHistorySaveKey);
+            paintingSaveHistoryData ??= new PaintingSaveHistoryData();
+            
+            foreach (string saveName in paintingSaveHistoryData.SaveNames.ToList())
+            {
+                if (SaveManager.Exists(saveName) == false)
+                {
+                    paintingSaveHistoryData.SaveNames.Remove(saveName);
+                }
+            }
+            
+            return paintingSaveHistoryData;
         }
         
         protected override void OnEnable()
         {
             base.OnEnable();
+            
+            _undoStack.Clear();
+            _redoStack.Clear();
 
-            bool didLoadSomething = Load();
+            bool didLoadSomething = LoadLast();
             
             if (didLoadSomething == false)
             {
-                InitDrawing();
+                CreateNewDrawing();
             }
 
             GenerateMesh();
         }
 
-        protected void Update()
+        private void OnDisable()
         {
-            if (_saveStopwatch.IsRunning == false)
-            {
-                _saveStopwatch.Restart();
-            }
-            
-            if (_saveStopwatch.ElapsedMilliseconds <= AutoSaveTimer)
-            {
-                return;
-            }
-
             Save();
-            _saveStopwatch.Restart();
         }
 
-        private void InitDrawing()
+        public void NewDrawing()
         {
+            CreateNewDrawing();
+            GenerateMesh();
+        }
+
+        private void CreateNewDrawing()
+        {
+            Save();
+            
             Profiler.BeginSample("InitDrawing");
             if (_heightmapInitType == HeightmapInitType.PerlinNoise)
             {
@@ -163,6 +304,18 @@ namespace VoxelPainter.Rendering
             {
                 InitDrawingUsingTexture();
             }
+            
+            _undoStack.Clear();
+            _redoStack.Clear();
+            
+            _undoStack.Add(new PaintingSaveData
+            {
+                VerticesValues = _verticesValuesNative.ToArray(),
+                VertexAmount = _cachedVertexAmount
+            });
+            
+            _currentSaveName = GUID.Generate().ToString();
+
             Profiler.EndSample();
         }
 
