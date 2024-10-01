@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using UnityEditor;
+using UnityEngine;
 using UnityEngine.UI;
 using VoxelPainter.Rendering;
 
@@ -42,7 +43,9 @@ namespace VoxelPainter.UI
             
             if (Application.isEditor)
             {
-                UnityEditor.EditorApplication.isPlaying = false;
+#if UNITY_EDITOR
+                EditorApplication.isPlaying = false;
+#endif
             }
             else
             {

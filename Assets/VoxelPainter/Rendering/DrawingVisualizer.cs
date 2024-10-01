@@ -2,12 +2,10 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
-using System.Diagnostics;
 using System.Linq;
 using Foxworks.Persistence;
 using Foxworks.Voxels;
 using Unity.Collections;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Profiling;
 using VoxelPainter.Rendering.Utils;
@@ -349,8 +347,8 @@ namespace VoxelPainter.Rendering
                 VerticesValues = _verticesValuesNative.ToArray(),
                 VertexAmount = _cachedVertexAmount
             });
-            
-            _currentSaveName = GUID.Generate().ToString();
+
+            _currentSaveName = Guid.NewGuid().ToString();
 
             Profiler.EndSample();
         }
