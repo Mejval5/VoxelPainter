@@ -2,6 +2,9 @@
 
 VoxelPainter is a Unity-based tool for creating and visualizing voxel-based graphics. This project leverages advanced rendering techniques such as Marching Cubes, Simplex Noise, and custom shaders to provide an interactive 3D voxel painting experience. 
 
+## Download
+https://raccoon5.itch.io/voxel-painter
+
 ### Demos
 https://www.youtube.com/watch?v=owe9IhLvLaY
 https://www.youtube.com/watch?v=6uRV_go0Ygc
