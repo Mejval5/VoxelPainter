@@ -16,7 +16,7 @@ namespace VoxelPainter.UI
     {
         private const string PaintValueSettingsSaveKey = "paint_value_settings";
 
-        [SerializeField] private Vector2 _range = new (1E-3f, 0.1f);
+        [SerializeField] private Vector2 _range = new (1E-6f, 0.1f);
         
         [SerializeField] private Slider _slider;
         [SerializeField] private Button _changeToColorButton;

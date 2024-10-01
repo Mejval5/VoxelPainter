@@ -31,6 +31,16 @@ namespace VoxelPainter.Rendering
     }
 
     [Serializable]
+    public class PaintingPreviewData
+    {
+        public const string SaveAppendKey = "_preview";
+        public const string Extension = "png";
+        
+        public byte[] _previewTextureData;
+        public Vector2Int _previewTextureSize;
+    }
+
+    [Serializable]
     public class PaintingSaveHistoryData
     {
         public List<string> SaveNames = new();
@@ -48,6 +58,10 @@ namespace VoxelPainter.Rendering
         [field: Range(0f, 100f)] [field: SerializeField] public float InitOffset { get; set; } = 0f;
         [field: Range(1f, 100f)] [field: SerializeField] public float InitScale { get; set; } = 2f;
         [field: Range(1f, 100f)] [field: SerializeField] public float InitFrequency { get; set; } = 2f;
+        
+        [Header("Save Reference")]
+        [SerializeField] private Camera _previewCamera;
+        [SerializeField] private RenderTexture _previewRenderTexture;
         
         [Header("Texture Sample Parameters")]
         [SerializeField] private Texture2D _texture2D;
@@ -195,27 +209,54 @@ namespace VoxelPainter.Rendering
                 return;
             }
             
-            Profiler.BeginSample("SaveDrawing");
+            Profiler.BeginSample("SaveDrawing.ConvertToArray");
             PaintingSaveData saveData = new()
             {
                 VerticesValues = _verticesValuesNative.ToArray(),
                 VertexAmount = _cachedVertexAmount
             };
+            Profiler.EndSample();
             
             if (_paintingSaveHistoryData.SaveNames.Contains(_currentSaveName) == false)
             {
                 _paintingSaveHistoryData.SaveNames.Add(_currentSaveName);
             }
             
-            SaveManager.Save(DrawingHistorySaveKey, _paintingSaveHistoryData);
-            SaveManager.Save(_currentSaveName, saveData);
+            Profiler.BeginSample("SaveDrawing.TakeSnapshot");
+            _previewCamera.Render();
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("SaveDrawing.TakeSnapshot.ReadPixels");
+            RenderTexture.active = _previewRenderTexture;
+            Texture2D texture2D = new (_previewRenderTexture.width, _previewRenderTexture.height);
+            texture2D.ReadPixels(new Rect(0, 0, _previewRenderTexture.width, _previewRenderTexture.height), 0, 0);
+            texture2D.Apply();
+            RenderTexture.active = null;
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("SaveDrawing.SerializeSnapshot");
+            PaintingPreviewData previewData = new()
+            {
+                _previewTextureData = texture2D.EncodeToPNG(),
+                _previewTextureSize = new Vector2Int(texture2D.width, texture2D.height)
+            };
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("SaveDrawing.Save.History");
+            _ = SaveManager.SaveAsync(DrawingHistorySaveKey, _paintingSaveHistoryData);
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("SaveDrawing.Save.Data");
+            _ = SaveManager.SaveAsync(_currentSaveName, saveData);
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("SaveDrawing.Save.Preview");
+            _ = SaveManager.SaveAsync(_currentSaveName + PaintingPreviewData.SaveAppendKey, previewData, PaintingPreviewData.Extension);
             Profiler.EndSample();
         }
 
         private bool Load(string paintingName)
         {
-            Save();
-            
             Profiler.BeginSample("LoadDrawing");
             MarchingCubesVisualizer.GetVerticesValuesNative(ref _verticesValuesNative, new Vector3Int(VertexAmountX, VertexAmountY, VertexAmountZ));
             
@@ -278,11 +319,6 @@ namespace VoxelPainter.Rendering
             }
 
             GenerateMesh();
-        }
-
-        private void OnDisable()
-        {
-            Save();
         }
 
         public void NewDrawing()

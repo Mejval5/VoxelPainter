@@ -24,7 +24,6 @@ namespace VoxelPainter.Rendering
         private static readonly int FuzzinessPowerShaderName = Shader.PropertyToID("_FuzzinessPower");
         private const float MinBrushSize = 0.1f;
         private const float BrushSizePower = 2f;
-        private const float BrushValueToAddPower = 1.5f;
         
         [Header("References")]
         [SerializeField] private Camera _mainCamera;

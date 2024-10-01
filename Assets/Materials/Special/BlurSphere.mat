@@ -15,9 +15,9 @@ Material:
   m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
+  m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
+  m_CustomRenderQueue: 3016
   stringTagMap: {}
   disabledShaderPasses: []
   m_LockedProperties: 
@@ -38,14 +38,23 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _Base: 0.32
     - _BaseTransparency: 0.5
+    - _BaseWithoutFresnel: 0.1
+    - _Edge2: 0.72
+    - _EdgeEffect: 2.28
+    - _Fresnel: 3
+    - _FresnelBaseDivider: 12.76
     - _FuzinessPower: 1
+    - _FuzzinessPower: 5
+    - _InterceptDepth: 1
+    - _MaxFuzziness: 3
     - _QueueControl: 0
-    - _QueueOffset: 0
+    - _QueueOffset: 16
     - _Scale: 1
     m_Colors:
     - _Center: {r: 0, g: 0, b: 0, a: 0}
-    - _Color: {r: 0.881, g: 0.881, b: 0.881, a: 1}
+    - _Color: {r: 1, g: 0.8827608, b: 0.1490565, a: 1}
   m_BuildTextureStacks: []
 --- !u!114 &6067074625022015337
 MonoBehaviour:
