@@ -32,10 +32,19 @@ namespace VoxelPainter.Rendering
     public class PaintingPreviewData
     {
         public const string SaveAppendKey = "_preview";
-        public const string Extension = "png";
+        public const string ImageExtension = "png";
+        public const string MetaDataExtension = "json";
         
-        public byte[] _previewTextureData;
-        public Vector2Int _previewTextureSize;
+        public string SaveName;
+        
+        public byte[] ImageData;
+        public PaintingPreviewMetaData PreviewMetaData;
+    }
+
+    [Serializable]
+    public class PaintingPreviewMetaData
+    {
+        public Vector2Int PreviewTextureSize;
     }
 
     [Serializable]
@@ -84,6 +93,9 @@ namespace VoxelPainter.Rendering
         public int RedoCount => _redoStack.Count;
         
         public event Action UndoRedoStateChanged = delegate { };
+        
+        public PaintingSaveHistoryData PaintingSaveHistoryData => _paintingSaveHistoryData;
+        public string CurrentSaveName => _currentSaveName;
 
         public DrawingVisualizer()
         {
@@ -215,11 +227,14 @@ namespace VoxelPainter.Rendering
             };
             Profiler.EndSample();
             
-            if (_paintingSaveHistoryData.SaveNames.Contains(_currentSaveName) == false)
+            if (_paintingSaveHistoryData.SaveNames.Contains(_currentSaveName))
             {
-                _paintingSaveHistoryData.SaveNames.Add(_currentSaveName);
+                // Remove the current save name from the list, so it can be added to the end of the list.
+                _paintingSaveHistoryData.SaveNames.Remove(_currentSaveName);
             }
-            
+
+            _paintingSaveHistoryData.SaveNames.Add(_currentSaveName);
+
             Profiler.BeginSample("SaveDrawing.TakeSnapshot");
             _previewCamera.Render();
             Profiler.EndSample();
@@ -235,8 +250,11 @@ namespace VoxelPainter.Rendering
             Profiler.BeginSample("SaveDrawing.SerializeSnapshot");
             PaintingPreviewData previewData = new()
             {
-                _previewTextureData = texture2D.EncodeToPNG(),
-                _previewTextureSize = new Vector2Int(texture2D.width, texture2D.height)
+                ImageData = texture2D.EncodeToPNG(),
+                PreviewMetaData = new PaintingPreviewMetaData
+                {
+                    PreviewTextureSize = new Vector2Int(texture2D.width, texture2D.height)
+                }
             };
             Profiler.EndSample();
             
@@ -249,12 +267,16 @@ namespace VoxelPainter.Rendering
             Profiler.EndSample();
             
             Profiler.BeginSample("SaveDrawing.Save.Preview");
-            _ = SaveManager.SaveAsync(_currentSaveName + PaintingPreviewData.SaveAppendKey, previewData, PaintingPreviewData.Extension);
+            string saveName = _currentSaveName + PaintingPreviewData.SaveAppendKey;
+            _ = SaveManager.SaveAsync(saveName, previewData.ImageData, PaintingPreviewData.ImageExtension);
+            _ = SaveManager.SaveAsync(saveName, previewData.PreviewMetaData, PaintingPreviewData.MetaDataExtension);
             Profiler.EndSample();
         }
 
-        private bool Load(string paintingName)
+        public bool Load(string paintingName)
         {
+            Debug.Log("Loading painting: " + paintingName);
+            
             Profiler.BeginSample("LoadDrawing");
             MarchingCubesVisualizer.GetVerticesValuesNative(ref _verticesValuesNative, new Vector3Int(VertexAmountX, VertexAmountY, VertexAmountZ));
             
@@ -262,9 +284,22 @@ namespace VoxelPainter.Rendering
 
             if (saveData?.VerticesValues == null)
             {
+                Debug.LogWarning("Failed to load painting data.");
                 Profiler.EndSample();
                 return false;
             }
+            
+            if (_paintingSaveHistoryData.SaveNames.Contains(paintingName))
+            {
+                // Remove the current save name from the list, so it can be added to the end of the list.
+                _paintingSaveHistoryData.SaveNames.Remove(paintingName);
+            }
+            
+            _paintingSaveHistoryData.SaveNames.Add(paintingName);
+            
+            Profiler.BeginSample("SaveDrawing.Save.History");
+            _ = SaveManager.SaveAsync(DrawingHistorySaveKey, _paintingSaveHistoryData);
+            Profiler.EndSample();
             
             _verticesValuesNative.CopyFrom(saveData.VerticesValues);
             

@@ -87,7 +87,7 @@ namespace VoxelPainter.UI
                     t = time / duration;
                 }
 
-                t = EasingUtils.EaseOutCubic(t);
+                t = EasingUtils.CubicOut(t);
 
                 Vector2 position = _sideBar.anchoredPosition;
                 position.x = Mathf.Lerp(startPosition, targetPosition, t);

@@ -7,12 +7,15 @@ namespace VoxelPainter.UI
 {
     public class GameSectionPanel : MonoBehaviour
     {
+        [Header("Buttons")]
         [SerializeField] private Button _newGameButton;
         [SerializeField] private Button _loadGameButton;
         [SerializeField] private Button _settingsButton;
         [SerializeField] private Button _exitButton;
 
+        [Header("Dependencies")]
         [SerializeField] private DrawingVisualizer _drawingVisualizer;
+        [SerializeField] private LevelSelectionPanel _levelSelectionPanel;
         
         private void Awake()
         {
@@ -29,7 +32,7 @@ namespace VoxelPainter.UI
         
         private void OnLoadGameButtonClicked()
         {
-            Debug.Log("Load Game Button Clicked");
+            _levelSelectionPanel.gameObject.SetActive(true);
         }
         
         private void OnSettingsButtonClicked()
