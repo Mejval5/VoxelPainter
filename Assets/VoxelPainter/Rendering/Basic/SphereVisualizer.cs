@@ -2,7 +2,6 @@
 using Unity.Collections;
 using UnityEngine;
 using VoxelPainter.GridManagement;
-using VoxelPainter.Rendering.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
@@ -25,7 +24,7 @@ namespace VoxelPainter.VoxelVisualization
             {
                 Vector3Int pos = MarchingCubeUtils.ConvertIndexToPosition(i, floorSize, vertexAmount);
                 float distance = Vector3.Distance(middleOfPlanet, pos);
-                verticesValues[i] = VoxelDataUtils.PackValueAndVertexId(distance < _planetSurface ? 1f : 0f);
+                verticesValues[i] = VoxelDataUtils.PackValueAndVertexColor(distance < _planetSurface ? 1f : 0f);
             }
         }
     }

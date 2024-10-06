@@ -4,7 +4,6 @@ using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 using VoxelPainter.GridManagement;
-using VoxelPainter.Rendering.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
@@ -71,7 +70,7 @@ namespace VoxelPainter.VoxelVisualization
         
         private void GetVertexValues(NativeArray<int> verticesValues)
         {
-            verticesValues.CopyFrom(Cube.Corners.Select(corner => VoxelDataUtils.PackValueAndVertexId(corner.value)).ToArray());
+            verticesValues.CopyFrom(Cube.Corners.Select(corner => VoxelDataUtils.PackValueAndVertexColor(corner.value)).ToArray());
         }
 
 #if UNITY_EDITOR

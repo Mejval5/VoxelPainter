@@ -3,7 +3,6 @@ using Foxworks.Voxels;
 using Unity.Collections;
 using UnityEngine;
 using VoxelPainter.GridManagement;
-using VoxelPainter.Rendering.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
@@ -28,7 +27,7 @@ namespace VoxelPainter.VoxelVisualization
                 float y = (position.y + _generationProperties.Origin.y) * _generationProperties.Frequency / 1000f;
                 float z = (position.z + _generationProperties.Origin.z) * _generationProperties.Frequency / 1000f;
 
-                verticesValues[i] = VoxelDataUtils.PackValueAndVertexId(CustomNoiseSimplex(x, y, z));
+                verticesValues[i] = VoxelDataUtils.PackValueAndVertexColor(CustomNoiseSimplex(x, y, z));
             }
         }
 

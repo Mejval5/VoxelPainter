@@ -11,6 +11,11 @@ namespace VoxelPainter.VoxelVisualization
         Vector3[] SubVertices { get; }
         
         /// <summary>
+        /// Buffer for the base vertices.
+        /// </summary>
+        ComputeBuffer VerticesValuesBuffer { get; }
+        
+        /// <summary>
         /// This method is used to get the base vertices.
         /// Sets up the vertices arrays if they are not created or if the amount of vertices is different.
         /// </summary>

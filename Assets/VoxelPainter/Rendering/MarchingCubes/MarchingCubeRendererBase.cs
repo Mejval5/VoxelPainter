@@ -1,12 +1,12 @@
 ﻿using System;
 using Foxworks.Utils;
+using Foxworks.Voxels;
 using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Profiling;
 using VoxelPainter.GridManagement;
 using VoxelPainter.Rendering.MarchingCubes;
-using VoxelPainter.Rendering.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
@@ -128,7 +128,7 @@ namespace VoxelPainter.VoxelVisualization
             }
         }
 
-        protected void OnValidate()
+        protected virtual void OnValidate()
         {
             if (gameObject.activeInHierarchy == false)
             {

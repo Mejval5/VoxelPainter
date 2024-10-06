@@ -2,7 +2,6 @@
 using Unity.Collections;
 using UnityEngine;
 using VoxelPainter.GridManagement;
-using VoxelPainter.Rendering.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
@@ -25,7 +24,7 @@ namespace VoxelPainter.VoxelVisualization
                 float y = (position.y + _generationProperties.Origin.y) * _generationProperties.Frequency / 1000f;
                 float z = (position.z + _generationProperties.Origin.z) * _generationProperties.Frequency / 1000f;
             
-                verticesValues[i] = VoxelDataUtils.PackValueAndVertexId((Mathf.Sin(x) + Mathf.Cos(y) + Mathf.Cos(z) + 3) / 6f);
+                verticesValues[i] = VoxelDataUtils.PackValueAndVertexColor((Mathf.Sin(x) + Mathf.Cos(y) + Mathf.Cos(z) + 3) / 6f);
             }
         }
     }

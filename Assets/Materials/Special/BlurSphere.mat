@@ -17,7 +17,7 @@ Material:
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 3016
+  m_CustomRenderQueue: 2016
   stringTagMap: {}
   disabledShaderPasses: []
   m_LockedProperties: 
@@ -46,7 +46,7 @@ Material:
     - _Fresnel: 3
     - _FresnelBaseDivider: 12.76
     - _FuzinessPower: 1
-    - _FuzzinessPower: 5
+    - _FuzzinessPower: 0.09
     - _InterceptDepth: 1
     - _MaxFuzziness: 3
     - _QueueControl: 0

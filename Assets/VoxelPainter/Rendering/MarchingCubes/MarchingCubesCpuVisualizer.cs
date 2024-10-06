@@ -11,6 +11,8 @@ namespace VoxelPainter.VoxelVisualization
 {
     public class MarchingCubesCpuVisualizer : IMarchingCubesVisualizer
     {
+        private ComputeBuffer _baseVerticesValuesBuffer;
+        
         public NativeArray<int> VerticesValuesNative;
         public NativeArray<Vector3> BaseVerticesNative;
         public Vector3[] SubVertices { get; private set; }
@@ -19,6 +21,24 @@ namespace VoxelPainter.VoxelVisualization
 
         public NativeArray<int> ReadOnlyVerticesValuesNative => VerticesValuesNative;
         public NativeArray<Vector3> ReadOnlyBaseVertices => BaseVerticesNative;
+        public ComputeBuffer VerticesValuesBuffer => _baseVerticesValuesBuffer;
+        
+        /// <summary>
+        /// This method will set up the base vertices values buffer.
+        /// </summary>
+        /// <param name="preAllocatedBaseVertices"></param>
+        private void SetupBaseVerticesValuesBuffer(int preAllocatedBaseVertices)
+        {
+            const int sizeOfInt = sizeof(int);
+
+            if (_baseVerticesValuesBuffer == null || _baseVerticesValuesBuffer.count != preAllocatedBaseVertices)
+            {
+                _baseVerticesValuesBuffer?.Dispose();
+                _baseVerticesValuesBuffer = new ComputeBuffer(preAllocatedBaseVertices, sizeOfInt);
+            }
+            
+            _baseVerticesValuesBuffer.SetData(VerticesValuesNative);
+        }
         
         public void GetBaseVerticesNative(ref NativeArray<Vector3> vertices, Vector3Int vertexAmount)
         {
@@ -102,6 +122,10 @@ namespace VoxelPainter.VoxelVisualization
             }
 
             SetupVerticesArrays(vertexAmount);
+            
+            Profiler.BeginSample("MarchingCubesVisualizer.SetupBaseVerticesValuesBuffer");
+            SetupBaseVerticesValuesBuffer(preAllocatedVerticesValues);
+            Profiler.EndSample();
             
             // Triangle has 3 vertices
             int preAllocatedTriangles = amountOfCubes * MarchingCubeUtils.MaximumTrianglesPerCube * 3;

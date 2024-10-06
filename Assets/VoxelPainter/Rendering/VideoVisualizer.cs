@@ -4,7 +4,6 @@ using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Video;
 using VoxelPainter.GridManagement;
-using VoxelPainter.Rendering.Utils;
 
 namespace VoxelPainter.VoxelVisualization
 {
@@ -88,7 +87,7 @@ namespace VoxelPainter.VoxelVisualization
                 // Ensure the texture is available
                 if (_videoFrameTexture == null)
                 {
-                    verticesValues[i] = VoxelDataUtils.PackValueAndVertexId(0f, 0);
+                    verticesValues[i] = VoxelDataUtils.PackValueAndVertexColor(0f, 0);
                     continue;
                 }
 
@@ -134,7 +133,7 @@ namespace VoxelPainter.VoxelVisualization
                 }
                 
                 Profiler.EndSample();
-                verticesValues[i] = VoxelDataUtils.PackValueAndVertexId(finalValue);
+                verticesValues[i] = VoxelDataUtils.PackValueAndVertexColor(finalValue);
             }
         }
 

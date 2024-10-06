@@ -5,7 +5,9 @@
         "Foxworks",
         "Cinemachine",
         "NaughtyAttributes.Core",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "AYellowpaper.SerializedCollections",
+        "ColorPicker"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -8,7 +8,7 @@ using Foxworks.Voxels;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Profiling;
-using VoxelPainter.Rendering.Utils;
+using VoxelPainter.Rendering.Materials;
 using VoxelPainter.VoxelVisualization;
 using Debug = UnityEngine.Debug;
 
@@ -52,10 +52,19 @@ namespace VoxelPainter.Rendering
     {
         public List<string> SaveNames = new();
     }
+
+    [Serializable]
+    public enum RenderMaterialType
+    {
+        Basic,
+        VoxelColor
+    }
     
     [ExecuteAlways]
     public class DrawingVisualizer : MarchingCubeRendererBase
     {
+        private static readonly int VerticesValues = Shader.PropertyToID("VerticesValues");
+        private static readonly int Amount = Shader.PropertyToID("VertexAmount");
         private const string DrawingHistorySaveKey = "drawing_history";
         
         [SerializeField] private bool _allowRegeneration = false;
@@ -66,9 +75,16 @@ namespace VoxelPainter.Rendering
         [field: Range(1f, 100f)] [field: SerializeField] public float InitScale { get; set; } = 2f;
         [field: Range(1f, 100f)] [field: SerializeField] public float InitFrequency { get; set; } = 2f;
         
+        [Header("Materials")]
+        [SerializeField] private RenderMaterialType _materialType = RenderMaterialType.Basic;
+        [SerializeField] private Material _basicMaterial;
+        [SerializeField] private Material _voxelColorMaterial;
+        
         [Header("Save Reference")]
+        [SerializeField] private MeshRenderer _meshRenderer;
         [SerializeField] private Camera _previewCamera;
         [SerializeField] private RenderTexture _previewRenderTexture;
+        [SerializeField] private TerrainMaterialsConfigurator _terrainMaterialsConfigurator;
         
         [Header("Texture Sample Parameters")]
         [SerializeField] private Texture2D _texture2D;
@@ -96,6 +112,7 @@ namespace VoxelPainter.Rendering
         
         public PaintingSaveHistoryData PaintingSaveHistoryData => _paintingSaveHistoryData;
         public string CurrentSaveName => _currentSaveName;
+        public TerrainMaterialsConfigurator TerrainMaterialsConfigurator => _terrainMaterialsConfigurator;
 
         public DrawingVisualizer()
         {
@@ -336,6 +353,29 @@ namespace VoxelPainter.Rendering
             
             return paintingSaveHistoryData;
         }
+
+        protected virtual void Update()
+        {
+            UpdateMaterial();
+        }
+
+        private void UpdateMaterial()
+        {
+            if (MarchingCubesVisualizer.VerticesValuesBuffer == null)
+            {
+                return;
+            }
+            
+            _voxelColorMaterial.SetBuffer(VerticesValues, MarchingCubesVisualizer.VerticesValuesBuffer);
+            _voxelColorMaterial.SetVector(Amount, new Vector4(VertexAmountX, VertexAmountY, VertexAmountZ, VertexAmountX * VertexAmountZ));
+            
+            _meshRenderer.material = _materialType switch
+            {
+                RenderMaterialType.Basic => _basicMaterial,
+                RenderMaterialType.VoxelColor => _voxelColorMaterial,
+                _ => _basicMaterial
+            };
+        }
         
         protected override void OnEnable()
         {
@@ -409,7 +449,8 @@ namespace VoxelPainter.Rendering
                         valueThreshold = valueThreshold * _textureScale + _textureOffset;
                         valueThreshold *= VertexAmountY;
                         float value = (2f - y / valueThreshold) * Threshold;
-                        WriteIntoGrid(pos, value);
+                        Color vertexColor = TerrainMaterialsConfigurator.SampleGradient(y);
+                        WriteIntoGrid(pos, value, vertexColor);
                     }
                 }
             }
@@ -426,26 +467,27 @@ namespace VoxelPainter.Rendering
                         Vector3Int pos = new(x, y, z);
                         float sineOffset = InitScale * Mathf.PerlinNoise(z * InitFrequency / 51.164658416f, x * InitFrequency / 87.1777416f);
                         float value = y < VertexAmountY / 2f + sineOffset ? 1 : 0;
-                        WriteIntoGrid(pos, value);
+                        Color vertexColor = TerrainMaterialsConfigurator.SampleGradient(y);
+                        WriteIntoGrid(pos, value, vertexColor);
                     }
                 }
             }
         }
 
-        public void WriteIntoGrid(Vector3Int pos, float value)
+        public void WriteIntoGrid(Vector3Int pos, float value, Color vertexColor)
         {
             int index = MarchingCubeUtils.ConvertPositionToIndex(pos, VertexAmount);
-            WriteIntoGrid(index, value);
+            WriteIntoGrid(index, value, vertexColor);
         }
 
-        public void WriteIntoGrid(int index, float value)
+        public void WriteIntoGrid(int index, float value, Color vertexColor)
         {
             if (_verticesValuesNative.IsCreated == false)
             {
                 return;
             }
             
-            _verticesValuesNative[index] = VoxelDataUtils.PackValueAndVertexId(value, 0);
+            _verticesValuesNative[index] = VoxelDataUtils.PackValueAndVertexColor(value, vertexColor);
         }
 
         public override void GetVertexValues(NativeArray<int> verticesValues)

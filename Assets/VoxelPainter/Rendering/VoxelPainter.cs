@@ -5,16 +5,23 @@ using Foxworks.Voxels;
 using UnityEngine;
 using UnityEngine.Profiling;
 using VoxelPainter.ControlsManagement;
-using VoxelPainter.Rendering.Utils;
+using VoxelPainter.Rendering.Materials;
 
 namespace VoxelPainter.Rendering
 {
-    public enum CurrentPaintMode
+    public enum CurrentCursorMode
     {
         None,
         Draw,
         Erase,
         ChangeSizeMode
+    }
+    
+    [Serializable]
+    public enum PaintMode
+    {
+        Color,
+        Addition
     }
     
     [RequireComponent(typeof(DrawingVisualizer))]
@@ -54,7 +61,7 @@ namespace VoxelPainter.Rendering
         private Vector3 _changeSizeStartScreenPosition;
         private float _changeSizeScreenWorldRatio;
         
-        private CurrentPaintMode _currentPaintMode = CurrentPaintMode.None;
+        private CurrentCursorMode _currentCursorMode = CurrentCursorMode.None;
         private long _lastTimeDraw;
         
         private HitMeshInfo _hitInfo;
@@ -64,19 +71,19 @@ namespace VoxelPainter.Rendering
         private Material _brushMaterial;
         private Transform _brushTransform;
         private GameObject _brushGameObject;
-
-        private float MouseRadius => Mathf.Pow(_brushSize, BrushSizePower) * BrushSizeMultiplier + MinBrushSize;
         
         public event Action<float> BrushSizeChanged = delegate { };
         public event Action<float> FuzzinessChanged = delegate { };
         public event Action<float> ValueToAddChanged = delegate { };
 
+        private float MouseRadius => Mathf.Pow(_brushSize, BrushSizePower) * BrushSizeMultiplier + MinBrushSize;
         private float BrushSizeMultiplier => _drawingVisualizer.VertexAmount.magnitude / 2f;
-
 
         private float EffectiveRadius => MouseRadius * (EffectiveFuzziness + 1f);
         private float EffectiveFuzziness => _fuzziness * _fuzzinessScale;
         
+        public PaintMode PaintMode { get; set; } = PaintMode.Color;
+        public Color CurrentPaintColor { get; set; } = Color.white;
 
         public float ValueToAdd
         {
@@ -126,7 +133,7 @@ namespace VoxelPainter.Rendering
 
         private void ResetUserInteraction()
         {
-            _currentPaintMode = CurrentPaintMode.None;
+            _currentCursorMode = CurrentCursorMode.None;
         }
         
         protected void Update()
@@ -155,17 +162,17 @@ namespace VoxelPainter.Rendering
         
         private void ShowVisualIndicatorToUser()
         {
-            if (_hitInfo.IsHit == false && _currentPaintMode is not CurrentPaintMode.ChangeSizeMode)
+            if (_hitInfo.IsHit == false && _currentCursorMode is not CurrentCursorMode.ChangeSizeMode)
             {
                 _brushGameObject.SetActive(false);
                 return;
             }
             
-            Color color = _currentPaintMode switch
+            Color color = _currentCursorMode switch
             {
-                CurrentPaintMode.Draw => _drawColor,
-                CurrentPaintMode.Erase => _eraseColor,
-                CurrentPaintMode.ChangeSizeMode => _changeSizeColor,
+                CurrentCursorMode.Draw => _drawColor,
+                CurrentCursorMode.Erase => _eraseColor,
+                CurrentCursorMode.ChangeSizeMode => _changeSizeColor,
                 _ => _defaultColor
             };
 
@@ -174,7 +181,7 @@ namespace VoxelPainter.Rendering
             _brushMaterial.SetFloat(FuzzinessPowerShaderName, EffectiveFuzziness);
 
             Vector3 position = _changeSizeStartPosition;
-            if (_currentPaintMode is not CurrentPaintMode.ChangeSizeMode)
+            if (_currentCursorMode is not CurrentCursorMode.ChangeSizeMode)
             {
                 position = _hitInfo.HitPoint + _offsetOfSphereDraw * _hitInfo.Ray.direction * EffectiveRadius;
             }
@@ -186,7 +193,7 @@ namespace VoxelPainter.Rendering
 
         private void ProcessUserChangingBrushSize()
         {
-            if (_currentPaintMode is not CurrentPaintMode.ChangeSizeMode)
+            if (_currentCursorMode is not CurrentCursorMode.ChangeSizeMode)
             {
                 return;
             }
@@ -211,7 +218,7 @@ namespace VoxelPainter.Rendering
                 return;
             }
 
-            if (_currentPaintMode is not (CurrentPaintMode.Draw or CurrentPaintMode.Erase))
+            if (_currentCursorMode is not (CurrentCursorMode.Draw or CurrentCursorMode.Erase))
             {
                 return;
             }
@@ -225,7 +232,7 @@ namespace VoxelPainter.Rendering
 
             _lastTimeDraw = DateTime.Now.Ticks;
 
-            float addValue = _currentPaintMode is CurrentPaintMode.Draw ? _valueToAdd : -_valueToAdd;
+            float addValue = _currentCursorMode is CurrentCursorMode.Draw ? _valueToAdd : -_valueToAdd;
 
             AddValue(_brushTransform.position, addValue);
             _drawingVisualizer.GenerateMesh();
@@ -291,13 +298,13 @@ namespace VoxelPainter.Rendering
             bool noRemove = Controls.IsKeyPressed(VoxelControlKey.NegativePaint) == false;
             bool noAlt = Controls.IsKeyPressed(VoxelControlKey.AltModifier) == false;
             
-            bool stopDrawingOrErasing = _currentPaintMode is CurrentPaintMode.Draw && noDraw
-                                        || _currentPaintMode is CurrentPaintMode.Erase && noRemove;
+            bool stopDrawingOrErasing = _currentCursorMode is CurrentCursorMode.Draw && noDraw
+                                        || _currentCursorMode is CurrentCursorMode.Erase && noRemove;
             
-            bool stopInput = _currentPaintMode is CurrentPaintMode.Draw && noDraw
-                             || _currentPaintMode is CurrentPaintMode.Erase && noRemove
-                             || _currentPaintMode is CurrentPaintMode.ChangeSizeMode && noAlt
-                             || _currentPaintMode is CurrentPaintMode.ChangeSizeMode && noDraw && noRemove;
+            bool stopInput = _currentCursorMode is CurrentCursorMode.Draw && noDraw
+                             || _currentCursorMode is CurrentCursorMode.Erase && noRemove
+                             || _currentCursorMode is CurrentCursorMode.ChangeSizeMode && noAlt
+                             || _currentCursorMode is CurrentCursorMode.ChangeSizeMode && noDraw && noRemove;
 
             if (stopDrawingOrErasing)
             {
@@ -319,7 +326,7 @@ namespace VoxelPainter.Rendering
                 return;
             }
             
-            if (_currentPaintMode is not CurrentPaintMode.None)
+            if (_currentCursorMode is not CurrentCursorMode.None)
             {
                 return;
             }
@@ -363,12 +370,12 @@ namespace VoxelPainter.Rendering
 
         private void StartErasing()
         {
-            _currentPaintMode = CurrentPaintMode.Erase;
+            _currentCursorMode = CurrentCursorMode.Erase;
         }
 
         private void StartDrawing()
         {
-            _currentPaintMode = CurrentPaintMode.Draw;
+            _currentCursorMode = CurrentCursorMode.Draw;
             _drawingVisualizer.StartDrawing();
         }
 
@@ -394,7 +401,7 @@ namespace VoxelPainter.Rendering
             _changeSizeStartPosition = _hitInfo.HitPoint + MouseRadius * directionToPick.normalized;
             _changeSizeStartScreenPosition = _mainCamera.WorldToScreenPoint(_changeSizeStartPosition);
             _changeSizeScreenWorldRatio = Vector2.Distance(_changeSizeStartScreenPosition, Input.mousePosition) / MouseRadius;
-            _currentPaintMode = CurrentPaintMode.ChangeSizeMode;
+            _currentCursorMode = CurrentCursorMode.ChangeSizeMode;
         }
 
         private void AddValue(Vector3 position, float value)
@@ -434,7 +441,12 @@ namespace VoxelPainter.Rendering
 
                         float writtenValue = VoxelDataUtils.UnpackValue(_drawingVisualizer.VerticesValuesNative[index]);
                         float writeValue = Mathf.Clamp(writtenValue + additionAmount, 0, 1);
-                        _drawingVisualizer.WriteIntoGrid(index, writeValue);
+                        Color vertexColor = CurrentPaintColor;
+                        if (PaintMode is PaintMode.Addition)
+                        {
+                            vertexColor = _drawingVisualizer.TerrainMaterialsConfigurator.SampleGradient(y);
+                        }
+                        _drawingVisualizer.WriteIntoGrid(pos, writeValue, vertexColor);
                     }
                 }
             }

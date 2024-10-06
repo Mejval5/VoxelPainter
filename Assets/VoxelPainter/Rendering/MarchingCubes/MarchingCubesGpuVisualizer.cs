@@ -40,6 +40,8 @@ namespace VoxelPainter.Rendering.MarchingCubes
         private ComputeBuffer _triangleConnectionTableBuffer;
 
         private Array _subVerticesCleaningArray;
+        
+        public ComputeBuffer VerticesValuesBuffer => _baseVerticesValuesBuffer;
                 
         public void GetBaseVerticesNative(ref NativeArray<Vector3> vertices, Vector3Int vertexAmount)
         {
