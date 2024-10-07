@@ -65,6 +65,7 @@ namespace VoxelPainter.Rendering
     {
         private static readonly int VerticesValues = Shader.PropertyToID("VerticesValues");
         private static readonly int Amount = Shader.PropertyToID("VertexAmount");
+        private static readonly int NoiseModifier = Shader.PropertyToID("NoiseModifier");
         private const string DrawingHistorySaveKey = "drawing_history";
         
         [SerializeField] private bool _allowRegeneration = false;
@@ -77,6 +78,9 @@ namespace VoxelPainter.Rendering
         
         [Header("Materials")]
         [SerializeField] private RenderMaterialType _materialType = RenderMaterialType.Basic;
+        [Range(0f, 100f)] [SerializeField] private float _materialNoiseScale = 20f;
+        [SerializeField] private bool _enableNoise = true;
+        
         [SerializeField] private Material _basicMaterial;
         [SerializeField] private Material _voxelColorMaterial;
         
@@ -369,6 +373,11 @@ namespace VoxelPainter.Rendering
             _voxelColorMaterial.SetBuffer(VerticesValues, MarchingCubesVisualizer.VerticesValuesBuffer);
             _voxelColorMaterial.SetVector(Amount, new Vector4(VertexAmountX, VertexAmountY, VertexAmountZ, VertexAmountX * VertexAmountZ));
             
+            
+            float noiseScale = _enableNoise ? _materialNoiseScale : 0f;
+            _basicMaterial.SetFloat(NoiseModifier, noiseScale);
+            _voxelColorMaterial.SetFloat(NoiseModifier, noiseScale);
+            
             _meshRenderer.material = _materialType switch
             {
                 RenderMaterialType.Basic => _basicMaterial,
@@ -472,6 +481,18 @@ namespace VoxelPainter.Rendering
                     }
                 }
             }
+        }
+        
+        public void WriteIntoGrid(int index, Color vertexColor)
+        {
+            int valueInt = _verticesValuesNative[index];
+            _verticesValuesNative[index] = VoxelDataUtils.PackNativeValueAndVertexColor(valueInt, vertexColor);
+        }
+        
+        public void WriteIntoGrid(int index, float value)
+        {
+            int colorInt = VoxelDataUtils.UnpackVertexId(_verticesValuesNative[index]);
+            _verticesValuesNative[index] = VoxelDataUtils.PackValueAndNativeVertexColor(value, colorInt);
         }
 
         public void WriteIntoGrid(Vector3Int pos, float value, Color vertexColor)

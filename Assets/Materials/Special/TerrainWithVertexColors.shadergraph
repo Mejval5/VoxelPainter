@@ -2451,7 +2451,7 @@
     "m_DefaultRefNameVersion": 1,
     "m_RefNameGeneratedByDisplayName": "NoiseModifier",
     "m_DefaultReferenceName": "_NoiseModifier",
-    "m_OverrideReferenceName": "",
+    "m_OverrideReferenceName": "NoiseModifier",
     "m_GeneratePropertyBlock": true,
     "m_UseCustomSlotLabel": false,
     "m_CustomSlotLabel": "",

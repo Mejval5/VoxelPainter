@@ -22,10 +22,12 @@ void SampleVertexData_float(float3 position, out float3 color, out float value)
     int packedColor = (packedData >> 10) & 0x3FFFFF;
 
     // Unpack the 7-bit Red, 8-bit Green, and 7-bit Blue channels
-    float red   = float((packedColor >> 15) & 0x7F) / 127.0f;  // 7 bits for Red
-    float green = float((packedColor >> 7)  & 0xFF) / 255.0f;  // 8 bits for Green
-    float blue  = float(packedColor & 0x7F) / 127.0f;          // 7 bits for Blue
+    float red   = float((packedColor >> 15) & 127) / 127.0f;  // 7 bits for Red
+    float green = float((packedColor >> 7)  & 255) / 255.0f;  // 8 bits for Green
+    float blue  = float(packedColor & 127) / 127.0f;          // 7 bits for Blue
 
     // Return the normalized color
+    //const float precisionConstant = - 5.0f / 127.0f;
+    //color = float3(red + precisionConstant, green + precisionConstant, blue + precisionConstant);
     color = float3(red, green, blue);
 }

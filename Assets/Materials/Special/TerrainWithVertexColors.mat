@@ -55,12 +55,13 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - NoiseModifier: 20
     - _AO: 0
     - _BaseHeight: 0
     - _HeightScale: 50
     - _Metallic: 0
     - _NoiseBase: 0
-    - _NoiseModifier: 21.4
+    - _NoiseModifier: 21.1
     - _NoiseScale: 50
     - _NoiseSize: 0.1
     - _QueueControl: 0

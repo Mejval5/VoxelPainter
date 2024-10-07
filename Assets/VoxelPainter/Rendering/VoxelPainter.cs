@@ -183,7 +183,11 @@ namespace VoxelPainter.Rendering
             Vector3 position = _changeSizeStartPosition;
             if (_currentCursorMode is not CurrentCursorMode.ChangeSizeMode)
             {
-                position = _hitInfo.HitPoint + _offsetOfSphereDraw * _hitInfo.Ray.direction * EffectiveRadius;
+                position = _hitInfo.HitPoint;
+                if (PaintMode is PaintMode.Addition)
+                {
+                    position += _offsetOfSphereDraw * _hitInfo.Ray.direction * EffectiveRadius;
+                }
             }
 
             _brushTransform.position = position;
@@ -407,12 +411,15 @@ namespace VoxelPainter.Rendering
         private void AddValue(Vector3 position, float value)
         {
             float radius = EffectiveRadius;
-            value *= _timeDrawDelayMs / 1000f;
-            
-            // Smallest value to add is 1 / VoxelDataUtils.Values, so we need to ensure the value is at least that
-            // Fuzziness can affect the value
-            value = Mathf.Sign(value) * Mathf.Clamp(Mathf.Abs(value), 1f / VoxelDataUtils.Values * (Fuzziness + 1f), 1f);
-            
+
+            if (PaintMode is PaintMode.Addition)
+            {
+                value *= _timeDrawDelayMs / 1000f;
+                // Smallest value to add is 1 / VoxelDataUtils.Values, so we need to ensure the value is at least that
+                // Fuzziness can affect the value
+                value = Mathf.Sign(value) * Mathf.Clamp(Mathf.Abs(value), 1f / VoxelDataUtils.Values * (Fuzziness + 1f), 1f);
+            }
+
             Profiler.BeginSample("DrawingVisualizer.AddValue");
             // Only do update near the center to optimize
             int minX = Mathf.Max(0, (int)(position.x - radius));
@@ -434,19 +441,34 @@ namespace VoxelPainter.Rendering
                         {
                             continue;
                         }
-                        
+
                         int index = MarchingCubeUtils.ConvertPositionToIndex(pos, _drawingVisualizer.VertexAmount);
+                        int currentValuePacked = _drawingVisualizer.VerticesValuesNative[index];
+                        
                         float multiplier = 1 - Mathf.Pow(distance / radius, 4);
                         float additionAmount = Mathf.Clamp(value * multiplier, -1, 1);
-
-                        float writtenValue = VoxelDataUtils.UnpackValue(_drawingVisualizer.VerticesValuesNative[index]);
-                        float writeValue = Mathf.Clamp(writtenValue + additionAmount, 0, 1);
-                        Color vertexColor = CurrentPaintColor;
+                        
                         if (PaintMode is PaintMode.Addition)
                         {
-                            vertexColor = _drawingVisualizer.TerrainMaterialsConfigurator.SampleGradient(y);
+                            float writeValue = VoxelDataUtils.UnpackValue(currentValuePacked);
+                            writeValue = Mathf.Clamp(writeValue + additionAmount, 0, 1);
+                            _drawingVisualizer.WriteIntoGrid(index, writeValue);
                         }
-                        _drawingVisualizer.WriteIntoGrid(pos, writeValue, vertexColor);
+                        else
+                        {
+                            Color currentColor = VoxelDataUtils.UnpackVertexColor(currentValuePacked);
+                            Color newColor;
+                            if (additionAmount > 0f)
+                            {
+                                newColor = Color.Lerp(currentColor, CurrentPaintColor, additionAmount);
+                            }
+                            else
+                            {
+                                newColor = Color.Lerp(currentColor, currentColor.grayscale * Color.white, - additionAmount);
+                            }
+                            
+                            _drawingVisualizer.WriteIntoGrid(index, newColor);
+                        }
                     }
                 }
             }

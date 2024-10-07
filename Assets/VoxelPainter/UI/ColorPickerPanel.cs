@@ -33,13 +33,17 @@ namespace VoxelPainter.UI
 
             UpdateVoxelPainter();
             
-            _colorPicker.color = ColorPickerSettings.Color;
-            
             _colorPicker.onColorChanged += OnColorChanged;
             _additionModeButton.onClick.AddListener(OnAdditionModeButtonClicked);
             _colorModeButton.onClick.AddListener(OnColorModeButtonClicked);
 
             UpdateVisuals();
+        }
+
+        private void Start()
+        {
+            // Needs to be done in start to let it initialize in Awake
+            _colorPicker.color = ColorPickerSettings.Color;
         }
 
         private void UpdateVisuals()
