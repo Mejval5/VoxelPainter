@@ -19,9 +19,10 @@ float Threshold;
 int AmountOfCubes;
 bool EnforceEmptyBorder;
 
-static const int ValueBits = 10; // First bits store value as 0f-1f
-static const int VertexIdBits = 8; // We consider next bits for vertex id, this is used to encode special data
-static const float ValueMultiplier = 1.0f / 1023.0f; // 1023 is the maximum value that can be stored in 10 bits
+static const int ValueBits = 11; // First bits store value as 0f-1f
+static const int Values = 1 << ValueBits;
+static const int ValueMask = (1 << ValueBits) - 1;
+static const float ValueMultiplier = 1.0f / ValueMask;
 
 int3 ConvertIndexToPosition(uint i, uint floorSize)
 {
@@ -47,7 +48,7 @@ float GetBaseVerticesValue(uint index)
     int encodedValue = BaseVerticesValues[index];
 
     // Extract the last 10 bits (mask with 0x3FF = 1023, which is 10 bits of 1s)
-    int last10BitsValue = encodedValue & 0x3FF;  // This extracts the last 10 bits
+    int last10BitsValue = encodedValue & ValueMask;  // This extracts the last 10 bits
 
     // Convert the 10 bits to a float value between 0 and 1
     return last10BitsValue * ValueMultiplier;

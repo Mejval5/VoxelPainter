@@ -14,6 +14,7 @@ namespace VoxelPainter.UI
         [SerializeField] private Button _exitButton;
 
         [Header("Dependencies")]
+        [SerializeField] private NewLevelDialog _newLevelDialog;
         [SerializeField] private DrawingVisualizer _drawingVisualizer;
         [SerializeField] private LevelSelectionPanel _levelSelectionPanel;
         
@@ -27,7 +28,7 @@ namespace VoxelPainter.UI
         
         private void OnNewGameButtonClicked()
         {
-            _drawingVisualizer.NewDrawing();
+            _newLevelDialog.gameObject.SetActive(true);
         }
         
         private void OnLoadGameButtonClicked()

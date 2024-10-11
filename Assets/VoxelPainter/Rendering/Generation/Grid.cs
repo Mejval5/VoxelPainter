@@ -65,11 +65,8 @@ namespace VoxelPainter.GridManagement
                     {
                         Vector3 offset = new (x * distanceBetweenVertices, y * distanceBetweenVertices, z * distanceBetweenVertices);
                         
-                        Vector3 vertex = offset + _generationProperties.Origin - halfSize;
-                        vertex.x *= _generationProperties.Frequency;
-                        vertex.y *= _generationProperties.Frequency;
-                        vertex.z *= _generationProperties.Frequency;
-                        float value = _noiseFunction.Invoke(vertex);      
+                        Vector3 vertex = offset - halfSize;
+                        float value = _noiseFunction.Invoke(vertex * _generationProperties.Frequency + _generationProperties.Origin);      
                         
                         GridPoints[i] = new GridPoint
                         {

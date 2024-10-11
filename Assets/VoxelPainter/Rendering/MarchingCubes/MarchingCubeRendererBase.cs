@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Foxworks.Utils;
 using Foxworks.Voxels;
 using Unity.Collections;
@@ -14,12 +16,14 @@ namespace VoxelPainter.VoxelVisualization
     /// Base class for the Marching Cubes renderer.
     /// This class is used to generate the mesh using the Marching Cubes algorithm.
     /// It can be used to generate the mesh using the CPU or the GPU.
-    /// The GPU implementation is faster but it requires a compute shader.
-    /// The CPU implementation is slower but it doesn't require a compute shader.
+    /// The GPU implementation is faster, but it requires a compute shader.
+    /// The CPU implementation is slower, but it doesn't require a compute shader.
     /// </summary>
     [ExecuteAlways]
     public abstract class MarchingCubeRendererBase : MonoBehaviour
     {
+        [SerializeField] private bool _updateEveryFrame;
+        
         [SerializeField] private bool _lerp = true;
         [SerializeField] private bool _visualizeBaseVertices;
         [SerializeField] private bool _visualizeSubVertices;
@@ -74,8 +78,16 @@ namespace VoxelPainter.VoxelVisualization
             get => _threshold;
         }
 
+        protected virtual void Update()
+        {
+            if (_updateEveryFrame && Application.isEditor)
+            {
+                GenerateMesh();
+            }
+        }
+
 #if UNITY_EDITOR
-        private void OnDrawGizmos()
+        protected void OnDrawGizmos()
         {
             if (_visualizeBaseVertices)
             {
@@ -93,16 +105,23 @@ namespace VoxelPainter.VoxelVisualization
         /// </summary>
         private void VisualizeSubVertices()
         {
+            Dictionary<int, Vector3> positions = new ();
             for (int i = 0; i < MarchingCubesVisualizer.SubVertices.Length; i++)
             {
-                Vector3 pos = MarchingCubesVisualizer.SubVertices[i];
+                positions[i] = MarchingCubesVisualizer.SubVertices[i];
+            }
+            IOrderedEnumerable<KeyValuePair<int, Vector3>> sortedPositions = positions.OrderByDescending(pair => Vector3.Distance(Camera.current.transform.position, pair.Value));
+            positions = sortedPositions.ToDictionary(pair => pair.Key, pair => pair.Value);
+            for (int i = 0; i < positions.Count; i++)
+            {
+                Vector3 pos = positions.ElementAt(i).Value;
                 if (pos == Vector3.zero)
                 {
                     continue;
                 }
                 Gizmos.color = Color.green;
                 Gizmos.DrawSphere(pos, _gizmoSize);
-                Handles.Label(pos + Vector3.down * 0.1f, i.ToString());
+                Handles.Label(pos + Vector3.down * 0.1f, positions.ElementAt(i).Key.ToString());
             }
         }
 
@@ -116,11 +135,20 @@ namespace VoxelPainter.VoxelVisualization
             MarchingCubesVisualizer.GetBaseVerticesNative(ref vertices, VertexAmount);
             MarchingCubesVisualizer.GetVerticesValuesNative(ref verticesValues, VertexAmount);
             
+            Dictionary<int, Vector3> positions = new ();
             for (int i = 0; i < vertices.Length; i++)
             {
-                Vector3 pos = vertices[i];
-                Gizmos.color = Color.Lerp(Color.black, Color.white, verticesValues[i]);
-                if (VoxelDataUtils.UnpackValue(verticesValues[i]) < Threshold)
+                positions[i] = vertices[i];
+            }
+            IOrderedEnumerable<KeyValuePair<int, Vector3>> sortedPositions = positions.OrderByDescending(pair => Vector3.Distance(Camera.current.transform.position, pair.Value));
+            positions = sortedPositions.ToDictionary(pair => pair.Key, pair => pair.Value);
+            
+            for (int i = 0; i < positions.Count; i++)
+            {
+                Vector3 pos = positions.ElementAt(i).Value;
+                float val = VoxelDataUtils.UnpackValue(verticesValues[positions.ElementAt(i).Key]);
+                Gizmos.color = Color.Lerp(Color.black, Color.white, val);
+                if (val < Threshold)
                 {
                     Gizmos.color *= Color.red;
                 }
@@ -142,6 +170,12 @@ namespace VoxelPainter.VoxelVisualization
 
         protected virtual void OnEnable()
         {
+            if (SystemInfo.supportsComputeShaders == false && UseGpu)
+            {
+                Debug.LogWarning("Compute shaders are not supported on this device. Falling back to CPU implementation.");
+                UseGpu = false;
+            }
+            
             if (UseGpu)
             {
                 _marchingCubesGpuVisualizer ??= new MarchingCubesGpuVisualizer();

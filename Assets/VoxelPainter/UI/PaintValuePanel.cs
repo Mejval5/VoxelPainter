@@ -9,7 +9,7 @@ namespace VoxelPainter.UI
     [Serializable]
     public class PaintValueSettings
     {
-        public float ValueToAdd = 0.03f;
+        public float ValueToAdd = 0.1f;
     }
     
     public class PaintValuePanel : MonoBehaviour

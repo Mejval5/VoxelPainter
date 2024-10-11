@@ -45,8 +45,10 @@ namespace VoxelPainter.VoxelVisualization
             _videoPlayer.Play();
         }
         
-        private void Update()
+        protected override void Update()
         {
+            base.Update();
+            
             if (_restartVideo)
             {
                 _videoPlayer.Stop();

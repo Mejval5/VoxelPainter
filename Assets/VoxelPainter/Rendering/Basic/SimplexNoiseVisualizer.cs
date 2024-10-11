@@ -23,9 +23,9 @@ namespace VoxelPainter.VoxelVisualization
             {
                 Vector3Int position =MarchingCubeUtils.ConvertIndexToPosition(i, floorSize, vertexAmount);
                 
-                float x = (position.x + _generationProperties.Origin.x) * _generationProperties.Frequency / 1000f;
-                float y = (position.y + _generationProperties.Origin.y) * _generationProperties.Frequency / 1000f;
-                float z = (position.z + _generationProperties.Origin.z) * _generationProperties.Frequency / 1000f;
+                float x = (position.x) * _generationProperties.Frequency / 1000f + _generationProperties.Origin.x;
+                float y = (position.y) * _generationProperties.Frequency / 1000f + _generationProperties.Origin.y;
+                float z = (position.z) * _generationProperties.Frequency / 1000f + _generationProperties.Origin.z;
 
                 verticesValues[i] = VoxelDataUtils.PackValueAndVertexColor(CustomNoiseSimplex(x, y, z));
             }

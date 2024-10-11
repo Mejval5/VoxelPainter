@@ -7,7 +7,7 @@ namespace VoxelPainter.GridManagement
     public class GenerationProperties
     {
         [field: SerializeField] public Vector3 Origin { get; set; }
-        [field: Range(1f, 500f)]
+        [field: Range(0f, 500f)]
         [field: SerializeField] public float Frequency { get; set; } = 50;
     }
 }

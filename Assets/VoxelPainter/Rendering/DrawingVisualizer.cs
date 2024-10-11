@@ -18,7 +18,8 @@ namespace VoxelPainter.Rendering
     public enum HeightmapInitType
     {
         PerlinNoise,
-        Texture
+        DefaultTexture,
+        Texture,
     }
 
     [Serializable]
@@ -69,10 +70,11 @@ namespace VoxelPainter.Rendering
         private const string DrawingHistorySaveKey = "drawing_history";
         
         [SerializeField] private bool _allowRegeneration = false;
-        [SerializeField] private HeightmapInitType _heightmapInitType;
+        [SerializeField] private HeightmapInitType _defaultHeightmapInitType;
         
         [field: Header("Perlin Noise Parameters")]
-        [field: Range(0f, 100f)] [field: SerializeField] public float InitOffset { get; set; } = 0f;
+        [field: SerializeField] public Vector2 PositionOffset { get; set; }
+        [field: Range(-100f, 100f)] [field: SerializeField] public float InitOffset { get; set; } = 0f;
         [field: Range(1f, 100f)] [field: SerializeField] public float InitScale { get; set; } = 2f;
         [field: Range(1f, 100f)] [field: SerializeField] public float InitFrequency { get; set; } = 2f;
         
@@ -91,7 +93,7 @@ namespace VoxelPainter.Rendering
         [SerializeField] private TerrainMaterialsConfigurator _terrainMaterialsConfigurator;
         
         [Header("Texture Sample Parameters")]
-        [SerializeField] private Texture2D _texture2D;
+        [SerializeField] private Texture2D _defaultHeightTexture2D;
         [SerializeField] private float _textureScale = 1f;
         [SerializeField] private float _textureOffset = 1f;
         [SerializeField] private float _textureScalePower = 1f;
@@ -154,7 +156,7 @@ namespace VoxelPainter.Rendering
 
                 if (_allowRegeneration || didChange)
                 {
-                    CreateNewDrawing();
+                    CreateNewDrawingData(_defaultHeightmapInitType);
                 }
 
                 base.GenerateMesh();
@@ -188,12 +190,13 @@ namespace VoxelPainter.Rendering
                 return;
             }
 
-            PaintingSaveData saveData = _undoStack.Last();
-            _undoStack.Remove(saveData);
-            _redoStack.Add(saveData);
+            PaintingSaveData currentStateSaveData = _undoStack.Last();
+            _undoStack.Remove(currentStateSaveData);
+            _redoStack.Add(currentStateSaveData);
             
-            _verticesValuesNative.CopyFrom(saveData.VerticesValues);
-            _cachedVertexAmount = saveData.VertexAmount;
+            PaintingSaveData saveDataToGoBackTo = _undoStack.Last();
+            _verticesValuesNative.CopyFrom(saveDataToGoBackTo.VerticesValues);
+            _cachedVertexAmount = saveDataToGoBackTo.VertexAmount;
             
             GenerateMesh();
         }
@@ -217,6 +220,11 @@ namespace VoxelPainter.Rendering
 
         private void CreateUndoPoint()
         {
+            if (_verticesValuesNative.IsCreated == false)
+            {
+                return;
+            }
+            
             Profiler.BeginSample("CreateUndoSavePoint");
             PaintingSaveData saveData = new()
             {
@@ -294,6 +302,21 @@ namespace VoxelPainter.Rendering
             Profiler.EndSample();
         }
 
+        public void DeletePainting(string paintingName)
+        {
+            _paintingSaveHistoryData.SaveNames.Remove(paintingName);
+            SaveManager.Save(DrawingHistorySaveKey, _paintingSaveHistoryData);
+            
+            SaveManager.Delete(paintingName);
+            SaveManager.Delete(paintingName + PaintingPreviewData.SaveAppendKey, PaintingPreviewData.ImageExtension);
+            SaveManager.Delete(paintingName + PaintingPreviewData.SaveAppendKey, PaintingPreviewData.MetaDataExtension);
+            
+            if (_currentSaveName == paintingName)
+            {
+                _currentSaveName = Guid.NewGuid().ToString();
+            }
+        }
+
         public bool Load(string paintingName)
         {
             Debug.Log("Loading painting: " + paintingName);
@@ -358,8 +381,10 @@ namespace VoxelPainter.Rendering
             return paintingSaveHistoryData;
         }
 
-        protected virtual void Update()
+        protected override void Update()
         {
+            base.Update();
+            
             UpdateMaterial();
         }
 
@@ -397,51 +422,83 @@ namespace VoxelPainter.Rendering
             
             if (didLoadSomething == false)
             {
-                CreateNewDrawing();
+                CreateNewDrawingData(_defaultHeightmapInitType);
             }
 
             GenerateMesh();
         }
 
-        public void NewDrawing()
+        public void GenerateDrawingAndRender(HeightmapInitType heightmapInitType = HeightmapInitType.DefaultTexture, Texture2D texture2D = null)
         {
-            CreateNewDrawing();
+            CreateNewDrawingData(heightmapInitType, texture2D);
             GenerateMesh();
         }
 
-        private void CreateNewDrawing()
+        /// <summary>
+        /// Creates a new drawing using the specified heightmap initialization type.
+        /// If the type is set to PerlinNoise, the drawing will be initialized using perlin noise.
+        /// If the type is set to DefaultTexture, the drawing will be initialized using the default height texture.
+        /// If the type is set to Texture, the drawing will be initialized using the specified texture.
+        /// </summary>
+        /// <param name="heightmapInitType"></param>
+        /// <param name="texture2D"></param>
+        private void CreateNewDrawingData(HeightmapInitType heightmapInitType, Texture2D texture2D = null)
         {
             Save();
             
             Profiler.BeginSample("InitDrawing");
-            if (_heightmapInitType == HeightmapInitType.PerlinNoise)
+            switch (heightmapInitType)
             {
-                InitDrawingUsingPerlinNoise();
-            }
-            else
-            {
-                InitDrawingUsingTexture();
+                case HeightmapInitType.PerlinNoise:
+                    InitDrawingUsingPerlinNoise();
+                    break;
+                
+                case HeightmapInitType.DefaultTexture:
+                    InitDrawingUsingTexture(_defaultHeightTexture2D);
+                    break;
+                
+                case HeightmapInitType.Texture:
+                    if (texture2D == null)
+                    {
+                        Debug.LogWarning("Texture2D is null. Initialized painting using default texture.");
+                        texture2D = _defaultHeightTexture2D;
+                    }
+                    
+                    if (texture2D.isReadable == false)
+                    {
+                        Debug.LogWarning("Texture2D is not readable. Initialized painting using default texture.");
+                        texture2D = _defaultHeightTexture2D;
+                    }
+                    
+                    InitDrawingUsingTexture(texture2D);
+                    break;
+                
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(heightmapInitType), heightmapInitType, null);
             }
             
             _undoStack.Clear();
             _redoStack.Clear();
             
-            _undoStack.Add(new PaintingSaveData
-            {
-                VerticesValues = _verticesValuesNative.ToArray(),
-                VertexAmount = _cachedVertexAmount
-            });
+            CreateUndoPoint();
 
             _currentSaveName = Guid.NewGuid().ToString();
 
             Profiler.EndSample();
         }
 
-        private void InitDrawingUsingTexture()
+        private void InitDrawingUsingTexture(Texture2D texture2D)
         {
-            if (_texture2D == null)
+            if (texture2D == null)
             {
                 Debug.LogWarning("Texture2D is null. Initialized painting using perlin noise.");
+                InitDrawingUsingPerlinNoise();
+                return;
+            }
+            
+            if (texture2D.isReadable == false)
+            {
+                Debug.LogWarning("Texture2D is not readable. Initialized painting using perlin noise.");
                 InitDrawingUsingPerlinNoise();
                 return;
             }
@@ -453,7 +510,7 @@ namespace VoxelPainter.Rendering
                     for (int z = 0; z < VertexAmountZ; z++)
                     {
                         Vector3Int pos = new(x, y, z);
-                        float valueThreshold = _texture2D.GetPixelBilinear(x / (float) VertexAmountX, z / (float) VertexAmountZ).r;
+                        float valueThreshold = texture2D.GetPixelBilinear(x / (float) VertexAmountX, z / (float) VertexAmountZ).grayscale;
                         valueThreshold = Mathf.Pow(valueThreshold, _textureScalePower);
                         valueThreshold = valueThreshold * _textureScale + _textureOffset;
                         valueThreshold *= VertexAmountY;
@@ -474,8 +531,8 @@ namespace VoxelPainter.Rendering
                     for (int z = 0; z < VertexAmountZ; z++)
                     {
                         Vector3Int pos = new(x, y, z);
-                        float sineOffset = InitScale * Mathf.PerlinNoise(z * InitFrequency / 51.164658416f, x * InitFrequency / 87.1777416f);
-                        float value = y < VertexAmountY / 2f + sineOffset ? 1 : 0;
+                        float sineOffset = InitScale * Mathf.PerlinNoise(z * InitFrequency / 200.16841531f + PositionOffset.x, x * InitFrequency / 207.1777416f + PositionOffset.y) + InitOffset;
+                        float value = 1f - y / (VertexAmountY / 2f + sineOffset);
                         Color vertexColor = TerrainMaterialsConfigurator.SampleGradient(y);
                         WriteIntoGrid(pos, value, vertexColor);
                     }
@@ -491,7 +548,7 @@ namespace VoxelPainter.Rendering
         
         public void WriteIntoGrid(int index, float value)
         {
-            int colorInt = VoxelDataUtils.UnpackVertexId(_verticesValuesNative[index]);
+            int colorInt = VoxelDataUtils.UnpackColorInt(_verticesValuesNative[index]);
             _verticesValuesNative[index] = VoxelDataUtils.PackValueAndNativeVertexColor(value, colorInt);
         }
 

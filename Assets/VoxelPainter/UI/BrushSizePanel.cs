@@ -9,7 +9,7 @@ namespace VoxelPainter.UI
     [Serializable]
     public class BrushSizeSettings
     {
-        public float BrushSize = 1f;
+        public float BrushSize = .5f;
     }
     
     public class BrushSizePanel : MonoBehaviour

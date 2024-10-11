@@ -9,7 +9,7 @@ namespace VoxelPainter.UI
     [Serializable]
     public class FuzzinessSettings
     {
-        public float FuzzinessSize = 0f;
+        public float FuzzinessSize = 0.25f;
     }
     
     public class FuzzinessSizePanel : MonoBehaviour

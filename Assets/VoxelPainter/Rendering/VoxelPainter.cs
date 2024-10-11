@@ -9,7 +9,7 @@ using VoxelPainter.Rendering.Materials;
 
 namespace VoxelPainter.Rendering
 {
-    public enum CurrentCursorMode
+    public enum CursorMode
     {
         None,
         Draw,
@@ -29,7 +29,7 @@ namespace VoxelPainter.Rendering
     {
         private static readonly int ColorShaderName = Shader.PropertyToID("_Color");
         private static readonly int FuzzinessPowerShaderName = Shader.PropertyToID("_FuzzinessPower");
-        private const float MinBrushSize = 0.1f;
+        private const float MinBrushSize = 0.5f;
         private const float BrushSizePower = 2f;
         
         [Header("References")]
@@ -45,6 +45,7 @@ namespace VoxelPainter.Rendering
         [Range(0f, 5f)] [SerializeField] private float _fuzziness = 0f;
         [Range(1f, 5f)] [SerializeField] private float _fuzzinessScale = 2f;
         [Range(0f, 2f)] [SerializeField] private float _offsetOfSphereDraw = 1f;
+        [Range(0f, 2f)] [SerializeField] private float _offsetOfSpherePaint = 0.25f;
         
         [Header("Advanced drawing settings")]
         [Range(10f, 500f)] [SerializeField] private float _timeDrawDelayMs = 50f;
@@ -60,9 +61,9 @@ namespace VoxelPainter.Rendering
         private Vector3 _changeSizeStartPosition;
         private Vector3 _changeSizeStartScreenPosition;
         private float _changeSizeScreenWorldRatio;
-        
-        private CurrentCursorMode _currentCursorMode = CurrentCursorMode.None;
+
         private long _lastTimeDraw;
+        private Vector3 _lastDrawPosition;
         
         private HitMeshInfo _hitInfo;
         
@@ -77,13 +78,16 @@ namespace VoxelPainter.Rendering
         public event Action<float> ValueToAddChanged = delegate { };
 
         private float MouseRadius => Mathf.Pow(_brushSize, BrushSizePower) * BrushSizeMultiplier + MinBrushSize;
-        private float BrushSizeMultiplier => _drawingVisualizer.VertexAmount.magnitude / 2f;
+        private float BrushSizeMultiplier => _drawingVisualizer.VertexAmount.magnitude / Mathf.Sqrt(3) / 4f;
 
-        private float EffectiveRadius => MouseRadius * (EffectiveFuzziness + 1f);
+        private float InnerRadius => MouseRadius / (EffectiveFuzziness + 1f);
         private float EffectiveFuzziness => _fuzziness * _fuzzinessScale;
         
         public PaintMode PaintMode { get; set; } = PaintMode.Color;
         public Color CurrentPaintColor { get; set; } = Color.white;
+        
+        public CursorMode CurrentCursorMode { get; private set; } = CursorMode.None;
+        public float CurrentCursorSpeed { get; private set; }
 
         public float ValueToAdd
         {
@@ -133,7 +137,7 @@ namespace VoxelPainter.Rendering
 
         private void ResetUserInteraction()
         {
-            _currentCursorMode = CurrentCursorMode.None;
+            CurrentCursorMode = CursorMode.None;
         }
         
         protected void Update()
@@ -162,17 +166,17 @@ namespace VoxelPainter.Rendering
         
         private void ShowVisualIndicatorToUser()
         {
-            if (_hitInfo.IsHit == false && _currentCursorMode is not CurrentCursorMode.ChangeSizeMode)
+            if (_hitInfo.IsHit == false && CurrentCursorMode is not CursorMode.ChangeSizeMode)
             {
                 _brushGameObject.SetActive(false);
                 return;
             }
             
-            Color color = _currentCursorMode switch
+            Color color = CurrentCursorMode switch
             {
-                CurrentCursorMode.Draw => _drawColor,
-                CurrentCursorMode.Erase => _eraseColor,
-                CurrentCursorMode.ChangeSizeMode => _changeSizeColor,
+                CursorMode.Draw => _drawColor,
+                CursorMode.Erase => _eraseColor,
+                CursorMode.ChangeSizeMode => _changeSizeColor,
                 _ => _defaultColor
             };
 
@@ -181,23 +185,27 @@ namespace VoxelPainter.Rendering
             _brushMaterial.SetFloat(FuzzinessPowerShaderName, EffectiveFuzziness);
 
             Vector3 position = _changeSizeStartPosition;
-            if (_currentCursorMode is not CurrentCursorMode.ChangeSizeMode)
+            if (CurrentCursorMode is not CursorMode.ChangeSizeMode)
             {
                 position = _hitInfo.HitPoint;
                 if (PaintMode is PaintMode.Addition)
                 {
-                    position += _offsetOfSphereDraw * _hitInfo.Ray.direction * EffectiveRadius;
+                    position += _offsetOfSphereDraw * _hitInfo.Ray.direction * MouseRadius;
+                }
+                else
+                {
+                    position += _offsetOfSpherePaint * _hitInfo.Ray.direction * MouseRadius;
                 }
             }
 
             _brushTransform.position = position;
-            _brushTransform.localScale = Vector3.one * EffectiveRadius * 2f;
+            _brushTransform.localScale = Vector3.one * MouseRadius * 2f;
             _brushGameObject.SetActive(true);
         }
 
         private void ProcessUserChangingBrushSize()
         {
-            if (_currentCursorMode is not CurrentCursorMode.ChangeSizeMode)
+            if (CurrentCursorMode is not CursorMode.ChangeSizeMode)
             {
                 return;
             }
@@ -222,7 +230,7 @@ namespace VoxelPainter.Rendering
                 return;
             }
 
-            if (_currentCursorMode is not (CurrentCursorMode.Draw or CurrentCursorMode.Erase))
+            if (CurrentCursorMode is not (CursorMode.Draw or CursorMode.Erase))
             {
                 return;
             }
@@ -236,9 +244,12 @@ namespace VoxelPainter.Rendering
 
             _lastTimeDraw = DateTime.Now.Ticks;
 
-            float addValue = _currentCursorMode is CurrentCursorMode.Draw ? _valueToAdd : -_valueToAdd;
+            float addValue = CurrentCursorMode is CursorMode.Draw ? _valueToAdd : -_valueToAdd;
+            Vector3 drawPosition = _brushTransform.position;
+            CurrentCursorSpeed = (_lastDrawPosition - drawPosition).magnitude / Time.deltaTime;
+            _lastDrawPosition = drawPosition;
 
-            AddValue(_brushTransform.position, addValue);
+            AddValue(drawPosition, addValue);
             _drawingVisualizer.GenerateMesh();
         }
 
@@ -302,13 +313,13 @@ namespace VoxelPainter.Rendering
             bool noRemove = Controls.IsKeyPressed(VoxelControlKey.NegativePaint) == false;
             bool noAlt = Controls.IsKeyPressed(VoxelControlKey.AltModifier) == false;
             
-            bool stopDrawingOrErasing = _currentCursorMode is CurrentCursorMode.Draw && noDraw
-                                        || _currentCursorMode is CurrentCursorMode.Erase && noRemove;
+            bool stopDrawingOrErasing = CurrentCursorMode is CursorMode.Draw && noDraw
+                                        || CurrentCursorMode is CursorMode.Erase && noRemove;
             
-            bool stopInput = _currentCursorMode is CurrentCursorMode.Draw && noDraw
-                             || _currentCursorMode is CurrentCursorMode.Erase && noRemove
-                             || _currentCursorMode is CurrentCursorMode.ChangeSizeMode && noAlt
-                             || _currentCursorMode is CurrentCursorMode.ChangeSizeMode && noDraw && noRemove;
+            bool stopInput = CurrentCursorMode is CursorMode.Draw && noDraw
+                             || CurrentCursorMode is CursorMode.Erase && noRemove
+                             || CurrentCursorMode is CursorMode.ChangeSizeMode && noAlt
+                             || CurrentCursorMode is CursorMode.ChangeSizeMode && noDraw && noRemove;
 
             if (stopDrawingOrErasing)
             {
@@ -330,7 +341,7 @@ namespace VoxelPainter.Rendering
                 return;
             }
             
-            if (_currentCursorMode is not CurrentCursorMode.None)
+            if (CurrentCursorMode is not CursorMode.None)
             {
                 return;
             }
@@ -374,12 +385,13 @@ namespace VoxelPainter.Rendering
 
         private void StartErasing()
         {
-            _currentCursorMode = CurrentCursorMode.Erase;
+            CurrentCursorMode = CursorMode.Erase;
+            _drawingVisualizer.StartDrawing();
         }
 
         private void StartDrawing()
         {
-            _currentCursorMode = CurrentCursorMode.Draw;
+            CurrentCursorMode = CursorMode.Draw;
             _drawingVisualizer.StartDrawing();
         }
 
@@ -405,12 +417,14 @@ namespace VoxelPainter.Rendering
             _changeSizeStartPosition = _hitInfo.HitPoint + MouseRadius * directionToPick.normalized;
             _changeSizeStartScreenPosition = _mainCamera.WorldToScreenPoint(_changeSizeStartPosition);
             _changeSizeScreenWorldRatio = Vector2.Distance(_changeSizeStartScreenPosition, Input.mousePosition) / MouseRadius;
-            _currentCursorMode = CurrentCursorMode.ChangeSizeMode;
+            CurrentCursorMode = CursorMode.ChangeSizeMode;
         }
 
         private void AddValue(Vector3 position, float value)
         {
-            float radius = EffectiveRadius;
+            float radius = MouseRadius;
+            float innerRadius = InnerRadius;
+            float constantA = 1f / Mathf.Pow(innerRadius - radius, 4);
 
             if (PaintMode is PaintMode.Addition)
             {
@@ -422,12 +436,12 @@ namespace VoxelPainter.Rendering
 
             Profiler.BeginSample("DrawingVisualizer.AddValue");
             // Only do update near the center to optimize
-            int minX = Mathf.Max(0, (int)(position.x - radius));
-            int minY = Mathf.Max(0, (int)(position.y - radius));
-            int minZ = Mathf.Max(0, (int)(position.z - radius));
-            int maxX = Mathf.Min(_drawingVisualizer.VertexAmountX, (int)(position.x + radius));
-            int maxY = Mathf.Min(_drawingVisualizer.VertexAmountY, (int)(position.y + radius));
-            int maxZ = Mathf.Min(_drawingVisualizer.VertexAmountZ, (int)(position.z + radius));
+            int minX = Mathf.Max(0, Mathf.RoundToInt(position.x - radius));
+            int minY = Mathf.Max(0, Mathf.RoundToInt(position.y - radius));
+            int minZ = Mathf.Max(0, Mathf.RoundToInt(position.z - radius));
+            int maxX = Mathf.Min(_drawingVisualizer.VertexAmountX, Mathf.RoundToInt(position.x + radius));
+            int maxY = Mathf.Min(_drawingVisualizer.VertexAmountY, Mathf.RoundToInt(position.y + radius));
+            int maxZ = Mathf.Min(_drawingVisualizer.VertexAmountZ, Mathf.RoundToInt(position.z + radius));
 
             for (int x = minX; x < maxX; x++)
             {
@@ -445,8 +459,9 @@ namespace VoxelPainter.Rendering
                         int index = MarchingCubeUtils.ConvertPositionToIndex(pos, _drawingVisualizer.VertexAmount);
                         int currentValuePacked = _drawingVisualizer.VerticesValuesNative[index];
                         
-                        float multiplier = 1 - Mathf.Pow(distance / radius, 4);
-                        float additionAmount = Mathf.Clamp(value * multiplier, -1, 1);
+                        float inner = distance - radius;
+                        float multiplier = Mathf.Clamp01(constantA * Mathf.Pow(inner, 4));
+                        float additionAmount = Mathf.Clamp(value * multiplier, - 1f, 1f);
                         
                         if (PaintMode is PaintMode.Addition)
                         {
@@ -456,7 +471,7 @@ namespace VoxelPainter.Rendering
                         }
                         else
                         {
-                            Color currentColor = VoxelDataUtils.UnpackVertexColor(currentValuePacked);
+                            Color currentColor = VoxelDataUtils.UnpackColor(currentValuePacked);
                             Color newColor;
                             if (additionAmount > 0f)
                             {

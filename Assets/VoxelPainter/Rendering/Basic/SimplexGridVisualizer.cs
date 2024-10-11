@@ -12,7 +12,7 @@ namespace VoxelPainter.VoxelVisualization
     [ExecuteAlways]
     public class SimplexGridVisualizer : MonoBehaviour
     {
-        [FormerlySerializedAs("_gridProperties")] [SerializeField] private GridProperties _generationProperties;
+        [SerializeField] private GridProperties _generationProperties;
         [SerializeField] private MeshFilter _gridMeshFilter;        
         
         [Header("Draw Vertices")]

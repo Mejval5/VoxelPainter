@@ -141,9 +141,10 @@ namespace Foxworks.Components.CameraUtils
 
         private void HandleOrbiting()
         {
-            if (Controls.IsKeyPressed(VoxelControlKey.RotateHeld) && ScreenUtils.IsMouseInsideScreen)
+            if (Controls.IsKeyPressed(VoxelControlKey.RotateHeld) && ScreenUtils.IsMouseInsideScreen && _orbiting == false)
             {
                 _orbiting = true;
+                return;
             }
             
             if (Controls.IsKeyPressed(VoxelControlKey.RotateHeld) == false || Controls.IsKeyPressed(VoxelControlKey.AltModifier))
@@ -158,7 +159,7 @@ namespace Foxworks.Components.CameraUtils
 
             _currentAngle += Input.GetAxis("Mouse X") * _dragSpeed.x;
             _downAngle -= Input.GetAxis("Mouse Y") * _dragSpeed.y;
-            _downAngle = Mathf.Clamp(_downAngle, 1, 89);
+            _downAngle = Mathf.Clamp(_downAngle, -89, 89);
         }
 
         private void RecalculatePosition()

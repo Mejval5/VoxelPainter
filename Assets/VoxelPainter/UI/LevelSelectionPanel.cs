@@ -37,6 +37,8 @@ namespace VoxelPainter.UI
         private readonly Stopwatch _loadingStopwatch = new ();
         
         private CancellationTokenSource _cancellationTokenSource;
+        
+        private Dictionary<string, LevelPreviewButton> _levelPreviewButtons = new ();
 
         protected void Awake()
         {
@@ -75,6 +77,7 @@ namespace VoxelPainter.UI
                 return;
             }
             
+            _levelPreviewButtons.Clear();
             _contentHolder.DestroyAllChildren();
             
             _loadingCircle.SetActive(false);
@@ -99,10 +102,23 @@ namespace VoxelPainter.UI
                 levelPreviewButton.RawImage.texture = texture;
                 
                 levelPreviewButton.Clicked.AddListener(() => LoadLevel(previewData.SaveName));
+                levelPreviewButton.DeleteClicked.AddListener(() => DeleteLevel(previewData.SaveName));
                 levelPreviewButton.SetSelected(previewData.SaveName == _drawingVisualizer.CurrentSaveName);
                 levelPreviewButton.JuicyButton.Interactable = previewData.SaveName != _drawingVisualizer.CurrentSaveName;
                 levelPreviewButton.JuicyButton.DisableAlpha = 1f;
+                
+                _levelPreviewButtons[previewData.SaveName] = levelPreviewButton;
             }
+        }
+
+        private void DeleteLevel(string levelName)
+        {
+            LevelPreviewButton levelPreviewButton = _levelPreviewButtons[levelName];
+            
+            _drawingVisualizer.DeletePainting(levelName);
+            Destroy(levelPreviewButton.gameObject);
+            
+            _levelPreviewButtons.Remove(levelName);
         }
 
         private void LoadLevel(string saveName)

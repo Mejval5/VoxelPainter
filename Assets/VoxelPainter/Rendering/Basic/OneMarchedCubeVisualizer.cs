@@ -1,4 +1,6 @@
-﻿using System.Linq;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Foxworks.Voxels;
 using Unity.Collections;
 using UnityEditor;
@@ -13,10 +15,11 @@ namespace VoxelPainter.VoxelVisualization
     [ExecuteAlways]
     public class OneMarchedCubeVisualizer : MonoBehaviour
     {
-        [SerializeField] private float _surface;
+        [Range(0.01f, 0.99f)] [SerializeField] private float _surface;
 
         [field: SerializeField] public Color ActiveColor { get; private set; }
         [field: SerializeField] public Color InactiveColor { get; private set; }
+        [field: SerializeField] public Color SelectionColor { get; private set; }
         [field: SerializeField] public float GizmoSize { get; private set; } = 0.5f;
 
         [field: SerializeField] public Cube Cube { get; private set; }
@@ -38,6 +41,11 @@ namespace VoxelPainter.VoxelVisualization
 #endif
 
         private void Start()
+        {
+            UpdateMesh();
+        }
+
+        private void Update()
         {
             UpdateMesh();
         }
@@ -90,6 +98,11 @@ namespace VoxelPainter.VoxelVisualization
                 SceneView.duringSceneGui += OnScene;
             }
 
+            private void OnDestroy()
+            {
+                SceneView.duringSceneGui -= OnScene;
+            }
+
             private void OnScene(SceneView sceneView)
             {
                 if (_visualizer.gameObject.activeInHierarchy == false)
@@ -97,13 +110,25 @@ namespace VoxelPainter.VoxelVisualization
                     return;
                 }
                 
+                Dictionary<int, Vector3> positions = new ();
                 for (int i = 0; i < MarchingCubeUtils.CornersPerCube; i++)
                 {
-                    DrawCorner(i);
+                    positions[i] = GetCornerPosition(i);
+                }
+                IOrderedEnumerable<KeyValuePair<int, Vector3>> sortedPositions = positions.OrderByDescending(pair => Vector3.Distance(Camera.current.transform.position, pair.Value));
+                
+                foreach (KeyValuePair<int, Vector3> pair in sortedPositions)
+                {
+                    DrawCorner(pair.Key);
                 }
 
                 if (Event.current.type == EventType.MouseMove)
                     HandleUtility.Repaint();
+            }
+            
+            private Vector3 GetCornerPosition(int index)
+            {
+                return _visualizer.transform.position + _visualizer.Cube.Corners[index].position;
             }
 
             private void DrawCorner(int index)

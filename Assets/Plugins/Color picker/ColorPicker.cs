@@ -142,6 +142,8 @@ public class ColorPicker : MonoBehaviour, IPointerDownHandler, IDragHandler, IPo
     private void ApplyColor()
     {
         image.material.SetVector(_HSV, new Vector3(h, s, v));
+        
+        image.color = color;
 
         onColorChanged?.Invoke(color);
     }

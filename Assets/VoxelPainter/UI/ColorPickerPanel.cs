@@ -9,8 +9,8 @@ namespace VoxelPainter.UI
     [Serializable]
     public class ColorPickerSettings
     {
-        public Color Color;
-        public PaintMode PaintMode;
+        public Color Color = Color.white;
+        public PaintMode PaintMode = PaintMode.Addition;
     }
     
     public class ColorPickerPanel : MonoBehaviour
@@ -22,6 +22,8 @@ namespace VoxelPainter.UI
         
         [SerializeField] private Button _additionModeButton;
         [SerializeField] private Button _colorModeButton;
+        [SerializeField] private Graphic _colorModeIcon;
+        
         [SerializeField] private Rendering.VoxelPainter _voxelPainter;
         
         public ColorPickerSettings ColorPickerSettings { get; private set; }
@@ -52,6 +54,11 @@ namespace VoxelPainter.UI
             _colorModeButton.gameObject.SetActive(ColorPickerSettings.PaintMode == PaintMode.Color);
             
             _colorPickerCover.SetActive(ColorPickerSettings.PaintMode is not PaintMode.Color);
+        }
+
+        private void Update()
+        {
+            _colorModeIcon.color = _colorPicker.color;
         }
 
         private void UpdateVoxelPainter()
