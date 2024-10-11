@@ -37,6 +37,8 @@ namespace VoxelPainter.VoxelVisualization
 
         [field: SerializeField] public bool UseGpu { get; private set; } = true;
         [field: SerializeField] public ComputeShader MarchingCubeComputeShader { get; private set; }
+        [field: SerializeField] public ComputeShader PhysicsComputeShader { get; private set; }
+        [field: SerializeField] public bool RunPhysics { get; set; }
         
         [field: SerializeField] public MeshFilter GridMeshFilter { get; private set; }
         
@@ -57,6 +59,8 @@ namespace VoxelPainter.VoxelVisualization
         
         public event Action<float> ThresholdChanged = delegate { };
         public event Action<bool> LerpChanged = delegate { };
+        
+        public int MovedVoxelsThisFrame => _marchingCubesGpuVisualizer.MovedVoxelsThisFrame;
         
         public bool Lerp
         {
@@ -203,7 +207,7 @@ namespace VoxelPainter.VoxelVisualization
                 _marchingCubesGpuVisualizer ??= new MarchingCubesGpuVisualizer();
                 MarchingCubesVisualizer = _marchingCubesGpuVisualizer;
                 _marchingCubesGpuVisualizer.MarchCubes(vertexAmount, Threshold, GridMeshFilter, 
-                    GetVertexValues, MarchingCubeComputeShader, _maxTriangles, _lerp, EnforceEmptyBorder);
+                    GetVertexValues, MarchingCubeComputeShader, PhysicsComputeShader, RunPhysics, _maxTriangles, _lerp, EnforceEmptyBorder);
             }
             else
             {

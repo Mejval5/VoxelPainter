@@ -21,6 +21,7 @@ namespace VoxelPainter.UI
         [SerializeField] private JuicyButton _newLevelPerlinButton;
         [SerializeField] private JuicyButton _newLevelDefaultButton;
         [SerializeField] private JuicyButton _newLevelPlayerHeightMapButton;
+        [SerializeField] private Toggle _useTextureColorToggle;
         
         [Header("Dependencies")]
         [SerializeField] private DrawingVisualizer _drawingVisualizer;
@@ -51,7 +52,7 @@ namespace VoxelPainter.UI
         
         private void OnNewLevelPlayerHeightMapButtonClicked()
         {
-            string pathToOpen = string.IsNullOrEmpty(_lastSelectedPath) ? Application.dataPath : _lastSelectedPath;
+            string pathToOpen = string.IsNullOrEmpty(_lastSelectedPath) ? "%userprofile%\\Pictures" : _lastSelectedPath;
             
             // Open file dialog for the user to select a JPG or PNG image
             ExtensionFilter[] filters = { new("Image files", "jpg", "png")};
@@ -70,7 +71,7 @@ namespace VoxelPainter.UI
 
             if (loadedTexture != null)
             {
-                _drawingVisualizer.GenerateDrawingAndRender(HeightmapInitType.Texture, loadedTexture);
+                _drawingVisualizer.GenerateDrawingAndRender(HeightmapInitType.Texture, loadedTexture, useTextureColor: _useTextureColorToggle.isOn);
             }
             else
             {

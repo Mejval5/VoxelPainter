@@ -25,8 +25,14 @@ namespace VoxelPainter.Rendering.MarchingCubes
         private static readonly int TriangleConnectionTable = Shader.PropertyToID("TriangleConnectionTable");
         private static readonly int AmountOfCubes = Shader.PropertyToID("AmountOfCubes");
         private static readonly int EnforceEmptyBorder = Shader.PropertyToID("EnforceEmptyBorder");
+        private static readonly int AmountOfVertices = Shader.PropertyToID("AmountOfVertices");
+        private static readonly int FrameHash = Shader.PropertyToID("FrameHash");
+        private static readonly int CounterBuffer = Shader.PropertyToID("CounterBuffer");
+
+        public int MovedVoxelsThisFrame { get; private set; }
         
         public Vector3[] SubVertices { get; private set; }
+        public int[] BaseVertices { get; private set; }
         
         private int[] _triangleIndices;
 
@@ -83,7 +89,7 @@ namespace VoxelPainter.Rendering.MarchingCubes
             }
             Profiler.EndSample();
         }
-        
+
         /// <summary>
         /// This method will march the cubes through the base vertices and render the mesh.
         /// </summary>
@@ -92,20 +98,27 @@ namespace VoxelPainter.Rendering.MarchingCubes
         /// <param name="gridMeshFilter"></param>
         /// <param name="getVertexValues">if you want to fill in the data during the mesh generation then you can enter them using this callback</param>
         /// <param name="computeShader"></param>
+        /// <param name="usePhysics"></param>
         /// <param name="maxTriangles"></param>
         /// <param name="useLerp"></param>
         /// <param name="enforceEmptyBorder"></param>
+        /// <param name="physicsComputeShader"></param>
         public void MarchCubes(
             Vector3Int vertexAmount, 
             float threshold, 
             MeshFilter gridMeshFilter,
             Action<NativeArray<int>> getVertexValues,
             ComputeShader computeShader,
+            ComputeShader physicsComputeShader = null,
+            bool usePhysics = false,
             int maxTriangles = int.MaxValue,
             bool useLerp = true,
             bool enforceEmptyBorder = true)
         {
             Profiler.BeginSample("MarchingCubesVisualizer.Setup");
+            usePhysics = usePhysics && physicsComputeShader != null;
+            MovedVoxelsThisFrame = 0;
+            
             int cubeAmountX = vertexAmount.x - 1;
             int cubeAmountY = vertexAmount.y - 1;
             int cubeAmountZ = vertexAmount.z - 1;
@@ -145,6 +158,13 @@ namespace VoxelPainter.Rendering.MarchingCubes
             int middleOffset = vertexAmount.x * cubeAmountZ + vertexAmount.z * cubeAmountX;
             int topOffset = vertexAmount.x * vertexAmount.z + middleOffset;
             Profiler.EndSample();
+
+            if (usePhysics)
+            {
+                Profiler.BeginSample("MarchingCubesVisualizer.RunPhysicsComputeShader");
+                SetupAndDispatchPhysicsComputeShader(physicsComputeShader, vertexAmount, threshold, floorSize, enforceEmptyBorder, preAllocatedBaseVertices);
+                Profiler.EndSample();
+            }
             
             Profiler.BeginSample("MarchingCubesVisualizer.InjectDataIntoComputeShader");
             InjectDataIntoComputeShader(vertexAmount, threshold, useLerp, floorSize, cubeAmountX, cubeAmountY, 
@@ -158,6 +178,52 @@ namespace VoxelPainter.Rendering.MarchingCubes
             Profiler.BeginSample("MarchingCubesVisualizer.GetDataAndRender");
             GetDataAndRender(vertexAmount, gridMeshFilter, maxTriangles, preAllocatedSubVertices);
             Profiler.EndSample();
+        }
+        
+        private void SetupAndDispatchPhysicsComputeShader(ComputeShader computeShader, Vector3Int vertexAmount, float threshold, int floorSize, bool enforceEmptyBorder, int amountOfVertices)
+        {
+            // Set the buffer on the compute shader
+            int kernelHandle = computeShader.FindKernel(ComputeShaderProgram);
+            computeShader.SetBuffer(kernelHandle, BaseVerticesValues, _baseVerticesValuesBuffer);
+            
+            computeShader.SetInt(AmountOfVertices, amountOfVertices);
+            computeShader.SetInts(VertexAmount, vertexAmount.x, vertexAmount.y, vertexAmount.z, floorSize);
+            computeShader.SetFloat(Threshold, threshold);
+            computeShader.SetBool(EnforceEmptyBorder, enforceEmptyBorder);
+
+            int frameNumber = Time.frameCount;
+            computeShader.SetInt(FrameHash, frameNumber);
+            
+            ComputeBuffer counterBuffer = new (1, sizeof(int), ComputeBufferType.Raw);
+
+            // Initialize the counter to 0
+            int[] counterInit = { 0 };
+            counterBuffer.SetData(counterInit);
+            
+            // Set the buffer on the compute shader
+            computeShader.SetBuffer(kernelHandle, CounterBuffer, counterBuffer);
+            
+            // Dispatch the compute shader
+            computeShader.GetKernelThreadGroupSizes(kernelHandle, out uint xSize, out _, out _);
+            int threadSizeX = (int)xSize;
+            int threadGroupsX = (amountOfVertices + threadSizeX - 1) / threadSizeX;
+            computeShader.Dispatch(kernelHandle, threadGroupsX, 1, 1);
+            
+            // Read back the data
+            if (BaseVertices == null || BaseVertices.Length != amountOfVertices)
+            {
+                BaseVertices = new int[amountOfVertices];
+            }
+            
+            _baseVerticesValuesBuffer.GetData(BaseVertices);
+            _verticesValuesNative.CopyFrom(BaseVertices);
+            
+            // Retrieve the counter value after the dispatch
+            int[] counterResult = new int[1];
+            counterBuffer.GetData(counterResult);
+            MovedVoxelsThisFrame = counterResult[0];
+            
+            counterBuffer.Release();
         }
 
         /// <summary>

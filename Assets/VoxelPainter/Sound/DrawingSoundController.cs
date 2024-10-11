@@ -27,7 +27,6 @@ namespace VoxelPainter.Sound
             _drawAudioSource.volume = 0;
             _drawAudioSource.pitch = (_drawAudioPitchRange.x + _drawAudioPitchRange.y) / 2;
             _drawAudioSource.loop = true;
-            _drawAudioSource.Play();
         }
 
         private void Update()

@@ -384,6 +384,11 @@ namespace VoxelPainter.Rendering
         protected override void Update()
         {
             base.Update();
+
+            if (RunPhysics)
+            {
+                Save();
+            }
             
             UpdateMaterial();
         }
@@ -428,9 +433,9 @@ namespace VoxelPainter.Rendering
             GenerateMesh();
         }
 
-        public void GenerateDrawingAndRender(HeightmapInitType heightmapInitType = HeightmapInitType.DefaultTexture, Texture2D texture2D = null)
+        public void GenerateDrawingAndRender(HeightmapInitType heightmapInitType = HeightmapInitType.DefaultTexture, Texture2D texture2D = null, bool useTextureColor = false)
         {
-            CreateNewDrawingData(heightmapInitType, texture2D);
+            CreateNewDrawingData(heightmapInitType, texture2D, useTextureColor);
             GenerateMesh();
         }
 
@@ -442,7 +447,8 @@ namespace VoxelPainter.Rendering
         /// </summary>
         /// <param name="heightmapInitType"></param>
         /// <param name="texture2D"></param>
-        private void CreateNewDrawingData(HeightmapInitType heightmapInitType, Texture2D texture2D = null)
+        /// <param name="useTextureColor"></param>
+        private void CreateNewDrawingData(HeightmapInitType heightmapInitType, Texture2D texture2D = null, bool useTextureColor = false)
         {
             Save();
             
@@ -454,7 +460,7 @@ namespace VoxelPainter.Rendering
                     break;
                 
                 case HeightmapInitType.DefaultTexture:
-                    InitDrawingUsingTexture(_defaultHeightTexture2D);
+                    InitDrawingUsingTexture(_defaultHeightTexture2D, useTextureColor);
                     break;
                 
                 case HeightmapInitType.Texture:
@@ -470,7 +476,7 @@ namespace VoxelPainter.Rendering
                         texture2D = _defaultHeightTexture2D;
                     }
                     
-                    InitDrawingUsingTexture(texture2D);
+                    InitDrawingUsingTexture(texture2D, useTextureColor);
                     break;
                 
                 default:
@@ -487,7 +493,7 @@ namespace VoxelPainter.Rendering
             Profiler.EndSample();
         }
 
-        private void InitDrawingUsingTexture(Texture2D texture2D)
+        private void InitDrawingUsingTexture(Texture2D texture2D, bool useTextureColor)
         {
             if (texture2D == null)
             {
@@ -510,12 +516,14 @@ namespace VoxelPainter.Rendering
                     for (int z = 0; z < VertexAmountZ; z++)
                     {
                         Vector3Int pos = new(x, y, z);
-                        float valueThreshold = texture2D.GetPixelBilinear(x / (float) VertexAmountX, z / (float) VertexAmountZ).grayscale;
+                        Color color = texture2D.GetPixelBilinear(x / (float)VertexAmountX, z / (float)VertexAmountZ);
+                        float valueThreshold = color.grayscale;
                         valueThreshold = Mathf.Pow(valueThreshold, _textureScalePower);
                         valueThreshold = valueThreshold * _textureScale + _textureOffset;
                         valueThreshold *= VertexAmountY;
                         float value = (2f - y / valueThreshold) * Threshold;
-                        Color vertexColor = TerrainMaterialsConfigurator.SampleGradient(y);
+                        bool sampleTextureColor = useTextureColor && Mathf.Abs(value - Threshold) < 0.1f;
+                        Color vertexColor = sampleTextureColor ? color : TerrainMaterialsConfigurator.SampleGradient(y);
                         WriteIntoGrid(pos, value, vertexColor);
                     }
                 }

@@ -31,7 +31,8 @@ namespace VoxelPainter.Rendering
         private static readonly int FuzzinessPowerShaderName = Shader.PropertyToID("_FuzzinessPower");
         private const float MinBrushSize = 0.5f;
         private const float BrushSizePower = 2f;
-        
+        private const float FuzzinessPower = 2;
+
         [Header("References")]
         [SerializeField] private Camera _mainCamera;
         [SerializeField] private MeshRenderer _brushRenderer;
@@ -424,7 +425,7 @@ namespace VoxelPainter.Rendering
         {
             float radius = MouseRadius;
             float innerRadius = InnerRadius;
-            float constantA = 1f / Mathf.Pow(innerRadius - radius, 4);
+            float constantA = 1f / Mathf.Pow(innerRadius - radius, FuzzinessPower);
 
             if (PaintMode is PaintMode.Addition)
             {
@@ -459,8 +460,8 @@ namespace VoxelPainter.Rendering
                         int index = MarchingCubeUtils.ConvertPositionToIndex(pos, _drawingVisualizer.VertexAmount);
                         int currentValuePacked = _drawingVisualizer.VerticesValuesNative[index];
                         
-                        float inner = distance - radius;
-                        float multiplier = Mathf.Clamp01(constantA * Mathf.Pow(inner, 4));
+                        float inner = radius - distance;
+                        float multiplier = Mathf.Clamp01(constantA * Mathf.Pow(inner, FuzzinessPower));
                         float additionAmount = Mathf.Clamp(value * multiplier, - 1f, 1f);
                         
                         if (PaintMode is PaintMode.Addition)

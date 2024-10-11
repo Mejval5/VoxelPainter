@@ -159,7 +159,7 @@ namespace Foxworks.Components.CameraUtils
 
             _currentAngle += Input.GetAxis("Mouse X") * _dragSpeed.x;
             _downAngle -= Input.GetAxis("Mouse Y") * _dragSpeed.y;
-            _downAngle = Mathf.Clamp(_downAngle, -89, 89);
+            _downAngle = Mathf.Clamp(_downAngle, -89.99f, 89.99f);
         }
 
         private void RecalculatePosition()

@@ -10,7 +10,6 @@ namespace VoxelPainter.UI
         [Header("Buttons")]
         [SerializeField] private Button _newGameButton;
         [SerializeField] private Button _loadGameButton;
-        [SerializeField] private Button _settingsButton;
         [SerializeField] private Button _exitButton;
 
         [Header("Dependencies")]
@@ -22,7 +21,6 @@ namespace VoxelPainter.UI
         {
             _newGameButton.onClick.AddListener(OnNewGameButtonClicked);
             _loadGameButton.onClick.AddListener(OnLoadGameButtonClicked);
-            _settingsButton.onClick.AddListener(OnSettingsButtonClicked);
             _exitButton.onClick.AddListener(OnExitButtonClicked);
         }
         
@@ -34,11 +32,6 @@ namespace VoxelPainter.UI
         private void OnLoadGameButtonClicked()
         {
             _levelSelectionPanel.gameObject.SetActive(true);
-        }
-        
-        private void OnSettingsButtonClicked()
-        {
-            Debug.Log("Settings Button Clicked");
         }
         
         private void OnExitButtonClicked()

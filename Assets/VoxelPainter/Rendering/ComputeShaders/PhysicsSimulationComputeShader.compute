@@ -3,13 +3,32 @@
 
 RWStructuredBuffer<int> BaseVerticesValues;
 
+// Buffer to store the atomic counter
+RWStructuredBuffer<int> CounterBuffer;
+
 int AmountOfVertices;
 int4 VertexAmount; // w represents the cube floor
+float Threshold;
 bool EnforceEmptyBorder;
+int FrameHash;
 
-static const int ValueBits = 10; // First bits store value as 0f-1f
-static const int VertexIdBits = 8; // We consider next bits for vertex id, this is used to encode special data
-static const float ValueMultiplier = 1.0f / 1023.0f; // 1023 is the maximum value that can be stored in 10 bits
+static const uint UpdateBits = 4;
+static const uint UpdateMask = (1 << UpdateBits);
+
+static const uint ValueBits = 11; // First bits store value as 0f-1f
+static const uint Values = 1 << ValueBits;
+static const uint ValueMask = (1 << ValueBits) - 1;
+static const float ValueMultiplier = 1.0f / ValueMask;
+        
+static const uint RedBits = 7; // First bits store red color component
+static const uint GreenBits = 7; // Next bits store green color component
+static const uint BlueBits = 7; // Next bits store blue color component
+static const uint RedMask = (1 << RedBits) - 1;
+static const uint GreenMask = (1 << GreenBits) - 1;
+static const uint BlueMask = (1 << BlueBits) - 1;
+        
+static const uint ColorBits = RedBits + GreenBits + BlueBits; // We consider next bits for vertex id, this is used to encode special data
+static const uint ColorsBitsMask = (1 << ColorBits) - 1;
 
 int3 ConvertIndexToPosition(uint i, uint floorSize)
 {
@@ -21,6 +40,20 @@ int3 ConvertIndexToPosition(uint i, uint floorSize)
     return pos;
 }
 
+// Unpack the vertex ID from the packed integer
+int UnpackColorInt(int packedValue)
+{
+    // Extract the vertex ID by shifting right by ValueBits (to get rid of the value)
+    return (packedValue >> ValueBits) & ColorsBitsMask;
+}
+
+int PackValueAndNativeVertexColor(float value, int colorInt = 0)
+{
+    int valueInt = (int) (value * ValueMask) & ValueMask;
+    int vertexIdInt = (colorInt & ColorsBitsMask) << ValueBits;
+    return vertexIdInt | valueInt;
+}
+
 float GetBaseVerticesValue(uint index)
 {
     if (EnforceEmptyBorder)
@@ -28,17 +61,43 @@ float GetBaseVerticesValue(uint index)
         int3 pos = ConvertIndexToPosition(index, VertexAmount.x * VertexAmount.z);
         if (pos.x == 0 || pos.x == VertexAmount.x - 1 || pos.y == 0 || pos.y == VertexAmount.y - 1 || pos.z == 0 || pos.z == VertexAmount.z - 1)
         {
-            return 0;
+            return 1;
         }
     }
     
     int encodedValue = BaseVerticesValues[index];
 
-    // Extract the last 10 bits (mask with 0x3FF = 1023, which is 10 bits of 1s)
-    int last10BitsValue = encodedValue & 0x3FF;  // This extracts the last 10 bits
+    int valueInt = encodedValue & ValueMask;
 
-    // Convert the 10 bits to a float value between 0 and 1
-    return last10BitsValue * ValueMultiplier;
+    return valueInt * ValueMultiplier;
+}
+
+int ImprovedHash(uint index)
+{
+    // Simple pseudo-random hash function combining index and frame number
+    uint h = index * 0x27d4eb2d;  // Multiplication with large prime for better bit spread
+    h ^= (h >> 15);  // XOR with shifted version of itself
+    h *= 0x85ebca6b;  // Further mixing with a large prime
+    h ^= (h >> 13);
+    return h;  // Mask to take the last 4 bits, yielding values 0 to 15
+}
+
+void MoveBetweenIndexes(uint fromIndex, uint toIndex)
+{
+    float fromVoxelValue = GetBaseVerticesValue(fromIndex);
+    float toVoxelValue = GetBaseVerticesValue(toIndex);
+    BaseVerticesValues[fromIndex] = PackValueAndNativeVertexColor(toVoxelValue, UnpackColorInt(BaseVerticesValues[fromIndex]));
+    BaseVerticesValues[toIndex] = PackValueAndNativeVertexColor(fromVoxelValue, UnpackColorInt(BaseVerticesValues[toIndex]));
+
+    InterlockedAdd(CounterBuffer[0], 1);  // Atomically increment the counter
+}
+
+void MoveBetweenIndexes(uint fromIndex, uint toIndex, float fromValue, float toValue)
+{
+    BaseVerticesValues[fromIndex] = PackValueAndNativeVertexColor(toValue, UnpackColorInt(BaseVerticesValues[fromIndex]));
+    BaseVerticesValues[toIndex] = PackValueAndNativeVertexColor(fromValue, UnpackColorInt(BaseVerticesValues[toIndex]));
+    
+    InterlockedAdd(CounterBuffer[0], 1);  // Atomically increment the counter
 }
 
 // Define the main compute function
@@ -52,8 +111,106 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         return;
     }
 
+    if (EnforceEmptyBorder)
+    {
+        int3 pos = ConvertIndexToPosition(index, VertexAmount.x * VertexAmount.z);
+        if (pos.x == 0 || pos.x == VertexAmount.x - 1 || pos.y == 0 || pos.y == VertexAmount.y - 1 || pos.z == 0 || pos.z == VertexAmount.z - 1)
+        {
+            return;
+        }
+    }
+
+    uint frameHash = ImprovedHash(FrameHash + index);
+
+    if (frameHash & UpdateMask != 0)
+    {
+        // Skip this voxel if it doesn't satisfy the hash condition (1/16)
+        return;
+    }
+
+    frameHash >>= UpdateBits;  // Shift the hash to get a new value for the next voxel
+
     int xIndex = index % VertexAmount.x;
     int zIndex = (index % VertexAmount.w) / VertexAmount.x;
     int yIndex = index / VertexAmount.w;
+    
+    // Get the current voxel value
+    float currentVoxelValue = GetBaseVerticesValue(index);
+
+    // Check if it's liquid (above the threshold is liquid, below is ground)
+    if (currentVoxelValue < Threshold)
+    {
+        return;
+    }
+    int belowIndex = (yIndex - 1) * VertexAmount.w + zIndex * VertexAmount.x + xIndex;
+    
+    // Simulate gravity by checking the voxel below (yIndex - 1)
+    if (yIndex > 0)
+    {
+        float belowVoxelValue = GetBaseVerticesValue(belowIndex);
+
+        // If the voxel below is air (below the threshold), swap the values (falling)
+        if (belowVoxelValue < Threshold)
+        {
+            MoveBetweenIndexes(index, belowIndex, currentVoxelValue, belowVoxelValue);
+            return;
+        }
+    }
+
+    // If the we can flow bellow like sand
+    int leftIndex = belowIndex - 1;
+    int rightIndex = belowIndex + 1;
+    int frontIndex = belowIndex + VertexAmount.x;  // Move in the positive z direction
+    int backIndex = belowIndex - VertexAmount.x;   // Move in the negative z direction
+
+    int direction = frameHash & 0x3;  // Mask to take the last 2 bits, yielding values 0 to 3
+    
+    // Check left
+    if (xIndex > 0 && direction == 0)
+    {
+        float leftVoxelValue = GetBaseVerticesValue(leftIndex);
+        if (leftVoxelValue < Threshold)
+        {
+            // Flow to the left if air is available
+            MoveBetweenIndexes(index, leftIndex, currentVoxelValue, leftVoxelValue);
+        }
+        return;
+    }
+
+    // Check right
+    if (xIndex < VertexAmount.x - 1 && direction == 1)
+    {
+        float rightVoxelValue = GetBaseVerticesValue(rightIndex);
+        if (rightVoxelValue < Threshold)
+        {
+            // Flow to the right if air is available
+            MoveBetweenIndexes(index, rightIndex, currentVoxelValue, rightVoxelValue);
+        }
+        return;
+    }
+
+    // Check front (positive z direction)
+    if (zIndex < VertexAmount.z - 1 && direction == 2)
+    {
+        float frontVoxelValue = GetBaseVerticesValue(frontIndex);
+        if (frontVoxelValue < Threshold)
+        {
+            // Flow to the front if air is available
+            MoveBetweenIndexes(index, frontIndex, currentVoxelValue, frontVoxelValue);
+        }
+        return;
+    }
+
+    // Check back (negative z direction)
+    if (zIndex > 0 && direction == 3)
+    {
+        float backVoxelValue = GetBaseVerticesValue(backIndex);
+        if (backVoxelValue < Threshold)
+        {
+            // Flow to the back if air is available
+            MoveBetweenIndexes(index, backIndex, currentVoxelValue, backVoxelValue);
+        }
+        return;
+    }
 }
 
