@@ -1,6 +1,7 @@
 ﻿#pragma kernel CSMain
 #pragma target 5.0
 
+RWStructuredBuffer<int> BaseVerticesValuesPrePhysics;
 RWStructuredBuffer<int> BaseVerticesValues;
 
 // Buffer to store the atomic counter
@@ -61,11 +62,11 @@ float GetBaseVerticesValue(uint index)
         int3 pos = ConvertIndexToPosition(index, VertexAmount.x * VertexAmount.z);
         if (pos.x == 0 || pos.x == VertexAmount.x - 1 || pos.y == 0 || pos.y == VertexAmount.y - 1 || pos.z == 0 || pos.z == VertexAmount.z - 1)
         {
-            return 1;
+            return 0;
         }
     }
     
-    int encodedValue = BaseVerticesValues[index];
+    int encodedValue = BaseVerticesValuesPrePhysics[index];
 
     int valueInt = encodedValue & ValueMask;
 
@@ -83,19 +84,44 @@ int ImprovedHash(uint index)
 }
 
 void MoveBetweenIndexes(uint fromIndex, uint toIndex)
-{
+{    
     float fromVoxelValue = GetBaseVerticesValue(fromIndex);
     float toVoxelValue = GetBaseVerticesValue(toIndex);
-    BaseVerticesValues[fromIndex] = PackValueAndNativeVertexColor(toVoxelValue, UnpackColorInt(BaseVerticesValues[fromIndex]));
-    BaseVerticesValues[toIndex] = PackValueAndNativeVertexColor(fromVoxelValue, UnpackColorInt(BaseVerticesValues[toIndex]));
+    
+    int fromColorInt = UnpackColorInt(BaseVerticesValuesPrePhysics[fromIndex]);
+    
+    if (EnforceEmptyBorder)
+    {
+        int3 pos = ConvertIndexToPosition(toIndex, VertexAmount.x * VertexAmount.z);
+        if (pos.x == 0 || pos.x == VertexAmount.x - 1 || pos.y == 0 || pos.y == VertexAmount.y - 1 || pos.z == 0 || pos.z == VertexAmount.z - 1)
+        {            
+        BaseVerticesValues[toIndex] = PackValueAndNativeVertexColor(fromVoxelValue, fromColorInt);
+            return;
+        }
+    }
+    
+    BaseVerticesValues[fromIndex] = PackValueAndNativeVertexColor(toVoxelValue, fromColorInt);
+    BaseVerticesValues[toIndex] = PackValueAndNativeVertexColor(fromVoxelValue, fromColorInt);
 
     InterlockedAdd(CounterBuffer[0], 1);  // Atomically increment the counter
 }
 
 void MoveBetweenIndexes(uint fromIndex, uint toIndex, float fromValue, float toValue)
 {
-    BaseVerticesValues[fromIndex] = PackValueAndNativeVertexColor(toValue, UnpackColorInt(BaseVerticesValues[fromIndex]));
-    BaseVerticesValues[toIndex] = PackValueAndNativeVertexColor(fromValue, UnpackColorInt(BaseVerticesValues[toIndex]));
+    int fromColorInt = UnpackColorInt(BaseVerticesValuesPrePhysics[fromIndex]);
+    
+    if (EnforceEmptyBorder)
+    {
+        int3 pos = ConvertIndexToPosition(toIndex, VertexAmount.x * VertexAmount.z);
+        if (pos.x == 0 || pos.x == VertexAmount.x - 1 || pos.y == 0 || pos.y == VertexAmount.y - 1 || pos.z == 0 || pos.z == VertexAmount.z - 1)
+        {            
+            BaseVerticesValues[toIndex] = PackValueAndNativeVertexColor(fromValue, fromColorInt);
+            return;
+        }
+    }
+    
+    BaseVerticesValues[fromIndex] = PackValueAndNativeVertexColor(toValue, fromColorInt);
+    BaseVerticesValues[toIndex] = PackValueAndNativeVertexColor(fromValue, fromColorInt);
     
     InterlockedAdd(CounterBuffer[0], 1);  // Atomically increment the counter
 }

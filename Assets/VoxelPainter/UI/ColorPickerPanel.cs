@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Foxworks.Persistence;
 using UnityEngine;
 using UnityEngine.UI;
@@ -22,7 +23,9 @@ namespace VoxelPainter.UI
         
         [SerializeField] private Button _additionModeButton;
         [SerializeField] private Button _colorModeButton;
-        [SerializeField] private Graphic _colorModeIcon;
+        [SerializeField] private Button _colorAndAdditionModeButton;
+        
+        [SerializeField] private List<Graphic> _colorModeIcons;
         
         [SerializeField] private Rendering.VoxelPainter _voxelPainter;
         
@@ -36,8 +39,9 @@ namespace VoxelPainter.UI
             UpdateVoxelPainter();
             
             _colorPicker.onColorChanged += OnColorChanged;
-            _additionModeButton.onClick.AddListener(OnAdditionModeButtonClicked);
-            _colorModeButton.onClick.AddListener(OnColorModeButtonClicked);
+            _additionModeButton.onClick.AddListener(OnChangeModeButtonClicked);
+            _colorModeButton.onClick.AddListener(OnChangeModeButtonClicked);
+            _colorAndAdditionModeButton.onClick.AddListener(OnChangeModeButtonClicked);
 
             UpdateVisuals();
         }
@@ -52,13 +56,17 @@ namespace VoxelPainter.UI
         {
             _additionModeButton.gameObject.SetActive(ColorPickerSettings.PaintMode == PaintMode.Addition);
             _colorModeButton.gameObject.SetActive(ColorPickerSettings.PaintMode == PaintMode.Color);
+            _colorAndAdditionModeButton.gameObject.SetActive(ColorPickerSettings.PaintMode == PaintMode.ColorAndAddition);
             
-            _colorPickerCover.SetActive(ColorPickerSettings.PaintMode is not PaintMode.Color);
+            _colorPickerCover.SetActive(ColorPickerSettings.PaintMode is PaintMode.Addition);
         }
 
         private void Update()
         {
-            _colorModeIcon.color = _colorPicker.color;
+            foreach (Graphic icon in _colorModeIcons)
+            {
+                icon.color = _colorPicker.color;
+            }
         }
 
         private void UpdateVoxelPainter()
@@ -77,19 +85,18 @@ namespace VoxelPainter.UI
 
         private void CyclePaintMode()
         {
-            ColorPickerSettings.PaintMode = ColorPickerSettings.PaintMode == PaintMode.Color ? PaintMode.Addition : PaintMode.Color;
+            ColorPickerSettings.PaintMode = ColorPickerSettings.PaintMode switch
+            {
+                PaintMode.Addition => PaintMode.Color,
+                PaintMode.Color => PaintMode.ColorAndAddition,
+                PaintMode.ColorAndAddition => PaintMode.Addition,
+                _ => throw new ArgumentOutOfRangeException()
+            };
+            
             UpdateVisuals();
         }
         
-        private void OnAdditionModeButtonClicked()
-        {
-            CyclePaintMode();
-            SaveManager.Save(ColorPickerSaveData, ColorPickerSettings);
-
-            UpdateVoxelPainter();
-        }
-        
-        private void OnColorModeButtonClicked()
+        private void OnChangeModeButtonClicked()
         {
             CyclePaintMode();
             SaveManager.Save(ColorPickerSaveData, ColorPickerSettings);

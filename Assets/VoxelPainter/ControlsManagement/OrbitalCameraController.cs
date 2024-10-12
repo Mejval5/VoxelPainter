@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Cinemachine;
 using Foxworks.Utils;
 using UnityEngine;
@@ -22,6 +24,8 @@ namespace Foxworks.Components.CameraUtils
         [SerializeField] private float _orthoRatio = 0.5f;
 
         [SerializeField] private DrawingVisualizer _drawingVisualizer;
+
+        [SerializeField] private List<GameObject> _inputConsumers;
         
         private float _currentAngle = 0f;
         private float _distance = 10f;
@@ -41,6 +45,11 @@ namespace Foxworks.Components.CameraUtils
         private void Update()
         {
             if (_centerPoint == null)
+            {
+                return;
+            }
+            
+            if (_inputConsumers.Count > 0 && _inputConsumers.Any(consumer => consumer.activeSelf))
             {
                 return;
             }

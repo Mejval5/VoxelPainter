@@ -6,7 +6,9 @@ namespace VoxelPainter.ControlsManagement
         PositivePaint,
         NegativePaint,
         RotateHeld,
-        AltModifier
+        AltModifier,
+        Undo,
+        Redo,
     }
 
     public static class Controls

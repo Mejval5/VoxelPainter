@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using Foxworks.Persistence;
 using Foxworks.Voxels;
 using Unity.Collections;
@@ -64,6 +66,8 @@ namespace VoxelPainter.Rendering
     [ExecuteAlways]
     public class DrawingVisualizer : MarchingCubeRendererBase
     {
+        private const int AutoSaveIntervalMiliseconds = 1000;
+        
         private static readonly int VerticesValues = Shader.PropertyToID("VerticesValues");
         private static readonly int Amount = Shader.PropertyToID("VertexAmount");
         private static readonly int NoiseModifier = Shader.PropertyToID("NoiseModifier");
@@ -103,6 +107,8 @@ namespace VoxelPainter.Rendering
         
         private NativeArray<int> _verticesValuesNative;
         private Vector3Int _cachedVertexAmount;
+        private bool _savedDataBeforeQuitting;
+        private readonly Stopwatch _autoSaveStopwatch = new();
         
         public NativeArray<int> VerticesValuesNative => _verticesValuesNative;
         
@@ -124,6 +130,8 @@ namespace VoxelPainter.Rendering
         {
             _undoStack.CollectionChanged += OnUndoCollectionChanged;
             _redoStack.CollectionChanged += OnRedoCollectionChanged;
+            
+            Application.wantsToQuit += ApplicationWantsToQuit;
         }
 
         private void OnUndoCollectionChanged(object _, NotifyCollectionChangedEventArgs __)
@@ -179,13 +187,13 @@ namespace VoxelPainter.Rendering
 
         public void StopDrawing()
         {
-            Save();
+            _ = Save();
             CreateUndoPoint();
         }
 
         public void Undo()
         {
-            if (_undoStack.Count == 0)
+            if (_undoStack.Count <= 1)
             {
                 return;
             }
@@ -236,7 +244,31 @@ namespace VoxelPainter.Rendering
             Profiler.EndSample();
         }
 
-        public void Save()
+        private bool ApplicationWantsToQuit()
+        {
+            if (Application.isEditor)
+            {
+                return true;
+            }
+            
+            _ = SaveDataBeforeQuitting();
+            
+            return _savedDataBeforeQuitting;
+        }
+
+        private async Task SaveDataBeforeQuitting()
+        {
+            await Save();
+            
+            _savedDataBeforeQuitting = true;
+
+#if UNITY_EDITOR
+                UnityEditor.EditorApplication.isPlaying = false;
+#endif
+            Application.Quit();
+        }
+
+        public async Task Save()
         {
             if (_verticesValuesNative.IsCreated == false)
             {
@@ -287,18 +319,18 @@ namespace VoxelPainter.Rendering
             };
             Profiler.EndSample();
             
-            Profiler.BeginSample("SaveDrawing.Save.History");
-            _ = SaveManager.SaveAsync(DrawingHistorySaveKey, _paintingSaveHistoryData);
-            Profiler.EndSample();
+            string previewSaveName = _currentSaveName + PaintingPreviewData.SaveAppendKey;
             
-            Profiler.BeginSample("SaveDrawing.Save.Data");
-            _ = SaveManager.SaveAsync(_currentSaveName, saveData);
-            Profiler.EndSample();
-            
-            Profiler.BeginSample("SaveDrawing.Save.Preview");
-            string saveName = _currentSaveName + PaintingPreviewData.SaveAppendKey;
-            _ = SaveManager.SaveAsync(saveName, previewData.ImageData, PaintingPreviewData.ImageExtension);
-            _ = SaveManager.SaveAsync(saveName, previewData.PreviewMetaData, PaintingPreviewData.MetaDataExtension);
+            List<Task> saveTasks = new()
+            {
+                SaveManager.SaveAsync(DrawingHistorySaveKey, _paintingSaveHistoryData),
+                SaveManager.SaveAsync(_currentSaveName, saveData),
+                SaveManager.SaveAsync(previewSaveName, previewData.ImageData, PaintingPreviewData.ImageExtension),
+                SaveManager.SaveAsync(previewSaveName, previewData.PreviewMetaData, PaintingPreviewData.MetaDataExtension)
+            };
+
+            Profiler.BeginSample("SaveDrawing.SaveAll");
+            await Task.WhenAll(saveTasks);
             Profiler.EndSample();
         }
 
@@ -307,9 +339,9 @@ namespace VoxelPainter.Rendering
             _paintingSaveHistoryData.SaveNames.Remove(paintingName);
             SaveManager.Save(DrawingHistorySaveKey, _paintingSaveHistoryData);
             
-            SaveManager.Delete(paintingName);
-            SaveManager.Delete(paintingName + PaintingPreviewData.SaveAppendKey, PaintingPreviewData.ImageExtension);
-            SaveManager.Delete(paintingName + PaintingPreviewData.SaveAppendKey, PaintingPreviewData.MetaDataExtension);
+            _ = SaveManager.DeleteAsync(paintingName);
+            _ = SaveManager.DeleteAsync(paintingName + PaintingPreviewData.SaveAppendKey, PaintingPreviewData.ImageExtension);
+            _ = SaveManager.DeleteAsync(paintingName + PaintingPreviewData.SaveAppendKey, PaintingPreviewData.MetaDataExtension);
             
             if (_currentSaveName == paintingName)
             {
@@ -384,13 +416,19 @@ namespace VoxelPainter.Rendering
         protected override void Update()
         {
             base.Update();
-
-            if (RunPhysics)
-            {
-                Save();
-            }
             
             UpdateMaterial();
+            
+            if (_autoSaveStopwatch.IsRunning == false)
+            {
+                _autoSaveStopwatch.Restart();
+            }
+            
+            if (_autoSaveStopwatch.ElapsedMilliseconds > AutoSaveIntervalMiliseconds)
+            {
+                _ = Save();
+                _autoSaveStopwatch.Restart();
+            }
         }
 
         private void UpdateMaterial()
@@ -419,6 +457,8 @@ namespace VoxelPainter.Rendering
         protected override void OnEnable()
         {
             base.OnEnable();
+            
+            _savedDataBeforeQuitting = false;
             
             _undoStack.Clear();
             _redoStack.Clear();
@@ -450,7 +490,7 @@ namespace VoxelPainter.Rendering
         /// <param name="useTextureColor"></param>
         private void CreateNewDrawingData(HeightmapInitType heightmapInitType, Texture2D texture2D = null, bool useTextureColor = false)
         {
-            Save();
+            _ = Save();
             
             Profiler.BeginSample("InitDrawing");
             switch (heightmapInitType)

@@ -28,6 +28,7 @@ namespace VoxelPainter.Rendering.MarchingCubes
         private static readonly int AmountOfVertices = Shader.PropertyToID("AmountOfVertices");
         private static readonly int FrameHash = Shader.PropertyToID("FrameHash");
         private static readonly int CounterBuffer = Shader.PropertyToID("CounterBuffer");
+        private static readonly int BaseVerticesValuesPrePhysics = Shader.PropertyToID("BaseVerticesValuesPrePhysics");
 
         public int MovedVoxelsThisFrame { get; private set; }
         
@@ -39,9 +40,11 @@ namespace VoxelPainter.Rendering.MarchingCubes
         private NativeArray<int> _verticesValuesNative;
         private NativeArray<Vector3> _baseVerticesNative;
         
+        private ComputeBuffer _baseVerticesValuesBuffer;
+        private ComputeBuffer _baseVerticesValuesPrePhysicsBuffer;
+        
         private ComputeBuffer _appendedTrianglesBuffer;
         private ComputeBuffer _subVerticesBuffer;
-        private ComputeBuffer _baseVerticesValuesBuffer;
         private ComputeBuffer _cubeEdgeFlagsBuffer;
         private ComputeBuffer _triangleConnectionTableBuffer;
 
@@ -147,7 +150,7 @@ namespace VoxelPainter.Rendering.MarchingCubes
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.SetupBaseVerticesValuesBuffer");
-            SetupBaseVerticesValuesBuffer(preAllocatedBaseVertices);
+            SetupBaseVerticesValuesBuffer(preAllocatedBaseVertices, usePhysics);
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.SetupStaticBuffers");
@@ -185,6 +188,7 @@ namespace VoxelPainter.Rendering.MarchingCubes
             // Set the buffer on the compute shader
             int kernelHandle = computeShader.FindKernel(ComputeShaderProgram);
             computeShader.SetBuffer(kernelHandle, BaseVerticesValues, _baseVerticesValuesBuffer);
+            computeShader.SetBuffer(kernelHandle, BaseVerticesValuesPrePhysics, _baseVerticesValuesPrePhysicsBuffer);
             
             computeShader.SetInt(AmountOfVertices, amountOfVertices);
             computeShader.SetInts(VertexAmount, vertexAmount.x, vertexAmount.y, vertexAmount.z, floorSize);
@@ -377,7 +381,7 @@ namespace VoxelPainter.Rendering.MarchingCubes
         /// This method will set up the base vertices values buffer.
         /// </summary>
         /// <param name="preAllocatedBaseVertices"></param>
-        private void SetupBaseVerticesValuesBuffer(int preAllocatedBaseVertices)
+        private void SetupBaseVerticesValuesBuffer(int preAllocatedBaseVertices, bool setupPhysicsBuffer)
         {
             const int sizeOfInt = sizeof(int);
 
@@ -388,6 +392,19 @@ namespace VoxelPainter.Rendering.MarchingCubes
             }
             
             _baseVerticesValuesBuffer.SetData(_verticesValuesNative);
+
+            if (setupPhysicsBuffer == false)
+            {
+                return;
+            }
+
+            if (_baseVerticesValuesPrePhysicsBuffer == null || _baseVerticesValuesPrePhysicsBuffer.count != preAllocatedBaseVertices)
+            {
+                _baseVerticesValuesPrePhysicsBuffer?.Dispose();
+                _baseVerticesValuesPrePhysicsBuffer = new ComputeBuffer(preAllocatedBaseVertices, sizeOfInt);
+            }
+                
+            _baseVerticesValuesPrePhysicsBuffer.SetData(_verticesValuesNative);
         }
 
         /// <summary>

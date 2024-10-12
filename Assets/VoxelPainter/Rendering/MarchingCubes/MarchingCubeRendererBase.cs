@@ -84,7 +84,7 @@ namespace VoxelPainter.VoxelVisualization
 
         protected virtual void Update()
         {
-            if (_updateEveryFrame && Application.isEditor)
+            if (_updateEveryFrame && Application.isEditor || RunPhysics)
             {
                 GenerateMesh();
             }

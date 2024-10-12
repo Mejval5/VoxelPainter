@@ -21,7 +21,8 @@ namespace VoxelPainter.Rendering
     public enum PaintMode
     {
         Color,
-        Addition
+        Addition,
+        ColorAndAddition
     }
     
     [RequireComponent(typeof(DrawingVisualizer))]
@@ -189,7 +190,7 @@ namespace VoxelPainter.Rendering
             if (CurrentCursorMode is not CursorMode.ChangeSizeMode)
             {
                 position = _hitInfo.HitPoint;
-                if (PaintMode is PaintMode.Addition)
+                if (PaintMode is PaintMode.Addition or PaintMode.ColorAndAddition && _hitInfo.HitExitWall == false)
                 {
                     position += _offsetOfSphereDraw * _hitInfo.Ray.direction * MouseRadius;
                 }
@@ -267,6 +268,23 @@ namespace VoxelPainter.Rendering
             Profiler.BeginSample("ProcessUserInput.ProcessButtonUp");
             ProcessButtonUp();
             Profiler.EndSample();
+
+            Profiler.BeginSample("ProcessUserInput.ProcessUndoRedo");
+            ProcessUndoRedo();
+            Profiler.EndSample();
+        }
+        
+        private void ProcessUndoRedo()
+        {
+            if (Controls.IsKeyDown(VoxelControlKey.Undo))
+            {
+                _drawingVisualizer.Undo();
+            }
+            
+            if (Controls.IsKeyDown(VoxelControlKey.Redo))
+            {
+                _drawingVisualizer.Redo();
+            }
         }
         
         private void ProcessRaycastHit()
@@ -427,12 +445,13 @@ namespace VoxelPainter.Rendering
             float innerRadius = InnerRadius;
             float constantA = 1f / Mathf.Pow(innerRadius - radius, FuzzinessPower);
 
-            if (PaintMode is PaintMode.Addition)
+            float addValue = value;
+            if (PaintMode is PaintMode.Addition or PaintMode.ColorAndAddition)
             {
-                value *= _timeDrawDelayMs / 1000f;
+                addValue *= _timeDrawDelayMs / 1000f;
                 // Smallest value to add is 1 / VoxelDataUtils.Values, so we need to ensure the value is at least that
                 // Fuzziness can affect the value
-                value = Mathf.Sign(value) * Mathf.Clamp(Mathf.Abs(value), 1f / VoxelDataUtils.Values * (Fuzziness + 1f), 1f);
+                addValue = Mathf.Sign(addValue) * Mathf.Clamp(Mathf.Abs(addValue), 1f / VoxelDataUtils.Values * (Fuzziness + 1f), 1f);
             }
 
             Profiler.BeginSample("DrawingVisualizer.AddValue");
@@ -462,28 +481,45 @@ namespace VoxelPainter.Rendering
                         
                         float inner = radius - distance;
                         float multiplier = Mathf.Clamp01(constantA * Mathf.Pow(inner, FuzzinessPower));
-                        float additionAmount = Mathf.Clamp(value * multiplier, - 1f, 1f);
+                        float additionAmount = Mathf.Clamp(addValue * multiplier, - 1f, 1f);
+                        float colorAddAmount = Mathf.Clamp(value * multiplier, - 1f, 1f);
+
+                        float writeValue = 0f;
+                        Color writeColor = Color.white;
                         
-                        if (PaintMode is PaintMode.Addition)
+                        if (PaintMode is PaintMode.Addition or PaintMode.ColorAndAddition)
                         {
-                            float writeValue = VoxelDataUtils.UnpackValue(currentValuePacked);
+                            writeValue = VoxelDataUtils.UnpackValue(currentValuePacked);
                             writeValue = Mathf.Clamp(writeValue + additionAmount, 0, 1);
-                            _drawingVisualizer.WriteIntoGrid(index, writeValue);
                         }
-                        else
+                        
+                        if (PaintMode is PaintMode.Color or PaintMode.ColorAndAddition)
                         {
                             Color currentColor = VoxelDataUtils.UnpackColor(currentValuePacked);
-                            Color newColor;
-                            if (additionAmount > 0f)
+                            
+                            if (colorAddAmount > 0f)
                             {
-                                newColor = Color.Lerp(currentColor, CurrentPaintColor, additionAmount);
+                                writeColor = Color.Lerp(currentColor, CurrentPaintColor, colorAddAmount);
                             }
                             else
                             {
-                                newColor = Color.Lerp(currentColor, currentColor.grayscale * Color.white, - additionAmount);
+                                writeColor = Color.Lerp(currentColor, currentColor.grayscale * Color.white, - colorAddAmount);
                             }
-                            
-                            _drawingVisualizer.WriteIntoGrid(index, newColor);
+                        }
+
+                        if (PaintMode is PaintMode.Addition)
+                        {
+                            _drawingVisualizer.WriteIntoGrid(index, writeValue);
+                        }
+                        
+                        if (PaintMode is PaintMode.Color)
+                        {
+                            _drawingVisualizer.WriteIntoGrid(index, writeColor);
+                        }
+                        
+                        if (PaintMode is PaintMode.ColorAndAddition)
+                        {
+                            _drawingVisualizer.WriteIntoGrid(index, writeValue, writeColor);
                         }
                     }
                 }

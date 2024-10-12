@@ -34,9 +34,9 @@ namespace VoxelPainter.UI
             _levelSelectionPanel.gameObject.SetActive(true);
         }
         
-        private void OnExitButtonClicked()
+        private async void OnExitButtonClicked()
         {
-            _drawingVisualizer.Save();
+            await _drawingVisualizer.Save();
             
             if (Application.isEditor)
             {
