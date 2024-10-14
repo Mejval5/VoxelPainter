@@ -108,6 +108,7 @@ namespace VoxelPainter.Rendering
         
         private NativeArray<int> _verticesValuesNative;
         private Vector3Int _cachedVertexAmount;
+        private bool _savingBeforeQuittingInProgress;
         private bool _savedDataBeforeQuitting;
         private readonly Stopwatch _autoSaveStopwatch = new();
         
@@ -268,14 +269,20 @@ namespace VoxelPainter.Rendering
             {
                 return true;
             }
+
+            if (_savingBeforeQuittingInProgress == false)
+            {
+                _ = SaveDataBeforeQuitting();
+            }
             
-            _ = SaveDataBeforeQuitting();
 
             return false;
         }
 
         private async Task SaveDataBeforeQuitting()
         {
+            _savingBeforeQuittingInProgress = true;
+            
             await Save();
             
             _savedDataBeforeQuitting = true;
@@ -475,6 +482,7 @@ namespace VoxelPainter.Rendering
             base.OnEnable();
             
             _savedDataBeforeQuitting = false;
+            _savingBeforeQuittingInProgress = false;
             
             _undoStack.Clear();
             _redoStack.Clear();
