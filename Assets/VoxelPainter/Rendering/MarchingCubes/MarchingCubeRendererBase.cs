@@ -84,6 +84,11 @@ namespace VoxelPainter.VoxelVisualization
 
         protected virtual void Update()
         {
+            if (_marchingCubesGpuVisualizer != null)
+            {
+                _marchingCubesGpuVisualizer.MovedVoxelsThisFrame = 0;
+            }
+            
             if (_updateEveryFrame && Application.isEditor || RunPhysics)
             {
                 GenerateMesh();
@@ -174,6 +179,7 @@ namespace VoxelPainter.VoxelVisualization
 
         protected virtual void OnEnable()
         {
+            
             if (SystemInfo.supportsComputeShaders == false && UseGpu)
             {
                 Debug.LogWarning("Compute shaders are not supported on this device. Falling back to CPU implementation.");
@@ -182,12 +188,20 @@ namespace VoxelPainter.VoxelVisualization
             
             if (UseGpu)
             {
-                _marchingCubesGpuVisualizer ??= new MarchingCubesGpuVisualizer();
+                if (_marchingCubesGpuVisualizer == null)
+                {
+                    ReleaseBuffers();
+                    _marchingCubesGpuVisualizer = new MarchingCubesGpuVisualizer();
+                }
                 MarchingCubesVisualizer = _marchingCubesGpuVisualizer;
             }
             else
             {
-                _marchingCubesCpuVisualizer ??= new MarchingCubesCpuVisualizer();
+                if (_marchingCubesCpuVisualizer == null)
+                {
+                    ReleaseBuffers();
+                    _marchingCubesCpuVisualizer = new MarchingCubesCpuVisualizer();
+                }
                 MarchingCubesVisualizer = _marchingCubesCpuVisualizer;
             }
         }
@@ -204,14 +218,24 @@ namespace VoxelPainter.VoxelVisualization
             Profiler.BeginSample("MarchCubes");
             if (UseGpu && AreComputeShadersSupported)
             {
-                _marchingCubesGpuVisualizer ??= new MarchingCubesGpuVisualizer();
+                if (_marchingCubesGpuVisualizer == null)
+                {
+                    ReleaseBuffers();
+                    _marchingCubesGpuVisualizer = new MarchingCubesGpuVisualizer();
+                }
+                
                 MarchingCubesVisualizer = _marchingCubesGpuVisualizer;
                 _marchingCubesGpuVisualizer.MarchCubes(vertexAmount, Threshold, GridMeshFilter, 
                     GetVertexValues, MarchingCubeComputeShader, PhysicsComputeShader, RunPhysics, _maxTriangles, _lerp, EnforceEmptyBorder);
             }
             else
             {
-                _marchingCubesCpuVisualizer ??= new MarchingCubesCpuVisualizer();
+                if (_marchingCubesCpuVisualizer == null)
+                {
+                    ReleaseBuffers();
+                    _marchingCubesCpuVisualizer = new MarchingCubesCpuVisualizer();
+                }
+                
                 MarchingCubesVisualizer = _marchingCubesCpuVisualizer;
                 _marchingCubesCpuVisualizer.MarchCubes(vertexAmount, Threshold, GridMeshFilter, 
                     GetVertexValues, _maxTriangles, _lerp, EnforceEmptyBorder);
@@ -231,6 +255,11 @@ namespace VoxelPainter.VoxelVisualization
         public abstract void GetVertexValues(NativeArray<int> verticesValues);
 
         protected virtual void OnDestroy()
+        {
+            ReleaseBuffers();
+        }
+        
+        private void ReleaseBuffers()
         {
             _marchingCubesGpuVisualizer?.ReleaseBuffers();
             _marchingCubesCpuVisualizer?.ReleaseBuffers();

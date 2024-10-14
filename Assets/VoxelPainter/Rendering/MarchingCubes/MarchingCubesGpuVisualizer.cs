@@ -30,7 +30,7 @@ namespace VoxelPainter.Rendering.MarchingCubes
         private static readonly int CounterBuffer = Shader.PropertyToID("CounterBuffer");
         private static readonly int BaseVerticesValuesPrePhysics = Shader.PropertyToID("BaseVerticesValuesPrePhysics");
 
-        public int MovedVoxelsThisFrame { get; private set; }
+        public int MovedVoxelsThisFrame { get; set; }
         
         public Vector3[] SubVertices { get; private set; }
         public int[] BaseVertices { get; private set; }
@@ -77,8 +77,19 @@ namespace VoxelPainter.Rendering.MarchingCubes
                 return;
             }
 
+            if (_baseVerticesNative.IsCreated)
+            {
+                _baseVerticesNative.Dispose();
+            }
+            
+            if (_verticesValuesNative.IsCreated)
+            {
+                _verticesValuesNative.Dispose();
+            }
+            
             _baseVerticesNative = new NativeArray<Vector3>(preAllocatedBaseVertices, Allocator.Persistent);
             _verticesValuesNative = new NativeArray<int>(preAllocatedBaseVertices, Allocator.Persistent);
+            
             Profiler.BeginSample("MarchingCubesVisualizer.SetUpVertices");
             int floorSize = vertexAmount.x * vertexAmount.z;
             for (int i = 0; i < preAllocatedBaseVertices; i++)
@@ -501,9 +512,11 @@ namespace VoxelPainter.Rendering.MarchingCubes
         /// </summary>
         public void ReleaseBuffers()
         {
+            _baseVerticesValuesBuffer?.Dispose();
+            _baseVerticesValuesPrePhysicsBuffer?.Dispose();
+            
             _appendedTrianglesBuffer?.Dispose();
             _subVerticesBuffer?.Dispose();
-            _baseVerticesValuesBuffer?.Dispose();
             _cubeEdgeFlagsBuffer?.Dispose();
             _triangleConnectionTableBuffer?.Dispose();
             

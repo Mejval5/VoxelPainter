@@ -5,7 +5,6 @@ using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
-using VoxelPainter.GridManagement;
 
 namespace VoxelPainter.VoxelVisualization
 {
@@ -13,14 +12,13 @@ namespace VoxelPainter.VoxelVisualization
     {
         private ComputeBuffer _baseVerticesValuesBuffer;
         
-        public NativeArray<int> VerticesValuesNative;
-        public NativeArray<Vector3> BaseVerticesNative;
+        private NativeArray<int> _verticesValuesNative;
+        private NativeArray<Vector3> _baseVerticesNative;
+        
         public Vector3[] SubVertices { get; private set; }
         public List<int> Triangles { get; private set; }
         public int[] ValidTriangles { get; private set; }
 
-        public NativeArray<int> ReadOnlyVerticesValuesNative => VerticesValuesNative;
-        public NativeArray<Vector3> ReadOnlyBaseVertices => BaseVerticesNative;
         public ComputeBuffer VerticesValuesBuffer => _baseVerticesValuesBuffer;
         
         /// <summary>
@@ -34,22 +32,24 @@ namespace VoxelPainter.VoxelVisualization
             if (_baseVerticesValuesBuffer == null || _baseVerticesValuesBuffer.count != preAllocatedBaseVertices)
             {
                 _baseVerticesValuesBuffer?.Dispose();
+                _baseVerticesValuesBuffer = null;
+                
                 _baseVerticesValuesBuffer = new ComputeBuffer(preAllocatedBaseVertices, sizeOfInt);
             }
             
-            _baseVerticesValuesBuffer.SetData(VerticesValuesNative);
+            _baseVerticesValuesBuffer.SetData(_verticesValuesNative);
         }
         
         public void GetBaseVerticesNative(ref NativeArray<Vector3> vertices, Vector3Int vertexAmount)
         {
             SetupVerticesArrays(vertexAmount);
-            vertices = BaseVerticesNative;
+            vertices = _baseVerticesNative;
         }
         
         public void GetVerticesValuesNative(ref NativeArray<int> verticesValues, Vector3Int vertexAmount)
         {
             SetupVerticesArrays(vertexAmount);
-            verticesValues = VerticesValuesNative;
+            verticesValues = _verticesValuesNative;
         }
         
         /// <summary>
@@ -59,14 +59,24 @@ namespace VoxelPainter.VoxelVisualization
         private void SetupVerticesArrays(Vector3Int vertexAmount)
         {
             int preAllocatedBaseVertices = vertexAmount.x * vertexAmount.y * vertexAmount.z;
-            bool recalculateVertexValues = VerticesValuesNative.IsCreated == false || preAllocatedBaseVertices != VerticesValuesNative.Length;
+            bool recalculateVertexValues = _verticesValuesNative.IsCreated == false || preAllocatedBaseVertices != _verticesValuesNative.Length;
             if (!recalculateVertexValues)
             {
                 return;
             }
 
-            BaseVerticesNative = new NativeArray<Vector3>(preAllocatedBaseVertices, Allocator.Persistent);
-            VerticesValuesNative = new NativeArray<int>(preAllocatedBaseVertices, Allocator.Persistent);
+            if (_baseVerticesNative.IsCreated)
+            {
+                _baseVerticesNative.Dispose();
+            }
+            
+            if (_verticesValuesNative.IsCreated)
+            {
+                _verticesValuesNative.Dispose();
+            }
+            
+            _baseVerticesNative = new NativeArray<Vector3>(preAllocatedBaseVertices, Allocator.Persistent);
+            _verticesValuesNative = new NativeArray<int>(preAllocatedBaseVertices, Allocator.Persistent);
                 
             int floorSize = vertexAmount.x * vertexAmount.z;
             for (int i = 0; i < preAllocatedBaseVertices; i++)
@@ -76,7 +86,7 @@ namespace VoxelPainter.VoxelVisualization
                 pos.z = (i % floorSize) / vertexAmount.x;
                 pos.y = i / floorSize;
 
-                BaseVerticesNative[i] = pos;
+                _baseVerticesNative[i] = pos;
             }
         }
         
@@ -137,9 +147,18 @@ namespace VoxelPainter.VoxelVisualization
             {
                 Triangles.Clear();
             }
+
             int[] baseVerticesOffsets =
             {
-                0, 1, floorSize + 1, floorSize, vertexAmount.x, vertexAmount.x + 1, vertexAmount.x + floorSize + 1, vertexAmount.x + floorSize
+                0,
+                1,
+                floorSize + 1, 
+                floorSize, 
+                
+                vertexAmount.x, 
+                vertexAmount.x + 1,
+                vertexAmount.x + floorSize + 1,
+                vertexAmount.x + floorSize
             };
 
             int middleOffset = vertexAmount.x * cubeAmountZ + vertexAmount.z * cubeAmountX;
@@ -151,7 +170,7 @@ namespace VoxelPainter.VoxelVisualization
             Profiler.EndSample();
             
             Profiler.BeginSample("MarchingCubesVisualizer.FillVertices");
-            getVertexValues(VerticesValuesNative);
+            getVertexValues(_verticesValuesNative);
             
             for (int i = 0; i < preAllocatedVerticesValues; i++)
             {
@@ -168,7 +187,7 @@ namespace VoxelPainter.VoxelVisualization
 
                 if (MarchingCubeUtils.IsBorder(pos, vertexAmount))
                 {
-                    VerticesValuesNative[i] = 0;
+                    _verticesValuesNative[i] = 0;
                 }
             }
             Profiler.EndSample();
@@ -271,7 +290,7 @@ namespace VoxelPainter.VoxelVisualization
 
                 MarchingCubeUtils.GetMarchedCube(
                     baseVerticesOffsets, 
-                    VerticesValuesNative, 
+                    _verticesValuesNative, 
                     verticesOffsets, 
                     threshold, 
                     SubVertices, 
@@ -286,8 +305,10 @@ namespace VoxelPainter.VoxelVisualization
         
         public void ReleaseBuffers()
         {
-            VerticesValuesNative.Dispose();
-            BaseVerticesNative.Dispose();
+            _verticesValuesNative.Dispose();
+            _baseVerticesNative.Dispose();
+            
+            _baseVerticesValuesBuffer?.Dispose();
         }
     }
 }

@@ -75,6 +75,7 @@ namespace VoxelPainter.Rendering
         
         [SerializeField] private bool _allowRegeneration = false;
         [SerializeField] private HeightmapInitType _defaultHeightmapInitType;
+        [SerializeField] private Transform _surroundCube;
         
         [field: Header("Perlin Noise Parameters")]
         [field: SerializeField] public Vector2 PositionOffset { get; set; }
@@ -175,6 +176,18 @@ namespace VoxelPainter.Rendering
             }
             finally
             {
+                if (_surroundCube != null)
+                {
+                    Vector3Int size = VertexAmount;
+                    if (EnforceEmptyBorder)
+                    {
+                        size -= Vector3Int.one * 2;
+                    }
+
+                    _surroundCube.localScale = size;
+                    _surroundCube.localPosition = (Vector3)size / 2f + Vector3.one / 2f;
+                }
+                
                 Generating = false;
                 Profiler.EndSample();
             }
@@ -250,10 +263,15 @@ namespace VoxelPainter.Rendering
             {
                 return true;
             }
+
+            if (_savedDataBeforeQuitting)
+            {
+                return true;
+            }
             
             _ = SaveDataBeforeQuitting();
-            
-            return _savedDataBeforeQuitting;
+
+            return false;
         }
 
         private async Task SaveDataBeforeQuitting()
@@ -329,9 +347,7 @@ namespace VoxelPainter.Rendering
                 SaveManager.SaveAsync(previewSaveName, previewData.PreviewMetaData, PaintingPreviewData.MetaDataExtension)
             };
 
-            Profiler.BeginSample("SaveDrawing.SaveAll");
             await Task.WhenAll(saveTasks);
-            Profiler.EndSample();
         }
 
         public void DeletePainting(string paintingName)

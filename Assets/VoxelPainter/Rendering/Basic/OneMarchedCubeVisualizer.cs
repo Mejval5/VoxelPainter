@@ -40,6 +40,11 @@ namespace VoxelPainter.VoxelVisualization
         }
 #endif
 
+        private void OnDestroy()
+        {
+            _marchingCubesCpuVisualizer?.ReleaseBuffers();
+        }
+
         private void Start()
         {
             UpdateMesh();

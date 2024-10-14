@@ -97,7 +97,11 @@ namespace VoxelPainter.Rendering.Materials
             {
                 _colors = new Color[_resolution];
             }
-            
+
+            if (_texture2D != null)
+            {
+                DestroyImmediate(_texture2D);
+            }
             _texture2D = new Texture2D(_resolution, 1, TextureFormat.RGBA32, false);
             
             for (int i = 0; i < _resolution; i++)

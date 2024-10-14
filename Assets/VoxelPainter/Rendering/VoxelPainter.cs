@@ -316,11 +316,10 @@ namespace VoxelPainter.Rendering
                 ray, 
                 _rayMarchStepSize, 
                 _drawingVisualizer.Threshold, 
-                _drawingVisualizer.VertexAmountX, 
-                _drawingVisualizer.VertexAmountY, 
-                _drawingVisualizer.VertexAmountZ, 
+                _drawingVisualizer.VertexAmount,
                 _drawingVisualizer.VerticesValuesNative, 
                 transform.position,
+                _drawingVisualizer.EnforceEmptyBorder,
                 hitExitWalls: true);
             _hitInfo.Ray = ray;
             Profiler.EndSample();
