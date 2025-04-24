@@ -5,12 +5,13 @@ VoxelPainter is a Unity-based tool for creating and visualizing voxel-based grap
 ## Download
 https://raccoon5.itch.io/voxel-painter
 
-### Demos
+### Demo
+https://www.youtube.com/watch?v=GF7qLDMbk3g
+
+### Early demos
+https://www.youtube.com/watch?v=RvF3tPzCbck
 https://www.youtube.com/watch?v=owe9IhLvLaY
 https://www.youtube.com/watch?v=6uRV_go0Ygc
-
-### Early demo
-https://www.youtube.com/watch?v=RvF3tPzCbck
 
 ## Features
 
